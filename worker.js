@@ -1,3 +1,4 @@
+cat > worker.js << 'EOF'
 const axios = require('axios');
 const { pool, initDatabase } = require('./database');
 
@@ -81,16 +82,15 @@ async function getRankForKeyword(keyword) {
                 location: keyword.country,
                 google_domain: googleDomain,
                 gl: getCountryCode(keyword.country),
-                num: 100 // Check top 100 results
+                num: 100
             },
-            timeout: 30000 // 30 second timeout
+            timeout: 30000
         });
         
         if (!response.data || !response.data.organic_results) {
             throw new Error('Invalid API response');
         }
         
-        // Find the rank of the target domain
         const results = response.data.organic_results;
         const targetDomain = keyword.domain.replace(/^https?:\/\//, '').replace(/^www\./, '');
         
@@ -99,11 +99,11 @@ async function getRankForKeyword(keyword) {
             const resultDomain = resultUrl.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
             
             if (resultDomain.includes(targetDomain) || targetDomain.includes(resultDomain)) {
-                return i + 1; // Rank is position + 1
+                return i + 1;
             }
         }
         
-        return null; // Not found in top 100
+        return null;
     } catch (error) {
         if (error.response) {
             throw new Error(`API Error: ${error.response.status} - ${error.response.data?.error || 'Unknown error'}`);
@@ -118,7 +118,6 @@ async function updateKeywordRank(keywordId, newRank) {
     try {
         await client.query('BEGIN');
         
-        // Get current rank to set as previous rank
         const currentResult = await client.query(
             'SELECT current_rank FROM keywords WHERE id = $1',
             [keywordId]
@@ -126,7 +125,6 @@ async function updateKeywordRank(keywordId, newRank) {
         
         const currentRank = currentResult.rows[0]?.current_rank;
         
-        // Update keyword with new rank
         await client.query(
             `UPDATE keywords 
              SET current_rank = $1, 
@@ -136,7 +134,6 @@ async function updateKeywordRank(keywordId, newRank) {
             [newRank, currentRank, keywordId]
         );
         
-        // Add to ranking history (only if rank was found)
         if (newRank !== null) {
             await client.query(
                 'INSERT INTO ranking_history (keyword_id, rank, checked_at) VALUES ($1, $2, NOW())',
@@ -169,8 +166,8 @@ function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Run the worker
 checkRankings().catch(error => {
     console.error('❌ Worker failed:', error);
     process.exit(1);
 });
+EOF
