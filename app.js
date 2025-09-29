@@ -468,9 +468,25 @@ bulkDeleteBtn.addEventListener('click', async () => {
 exportBtn.addEventListener('click', exportToCSV);
 
 // Modal
-closeModalBtn.addEventListener('click', () => historyModal.classList.remove('is-open'));
+function closeModal() {
+    historyModal.classList.remove('is-open');
+    // Restore canvas if it was replaced
+    const chartContainer = document.querySelector('#history-modal .p-6');
+    if (!document.getElementById('history-chart')) {
+        chartContainer.innerHTML = '<canvas id="history-chart"></canvas>';
+    }
+}
+
+closeModalBtn.addEventListener('click', closeModal);
 historyModal.addEventListener('click', (e) => {
     if (e.target === historyModal) {
-        historyModal.classList.remove('is-open');
+        closeModal();
+    }
+});
+
+// Also allow ESC key to close modal
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && historyModal.classList.contains('is-open')) {
+        closeModal();
     }
 });
