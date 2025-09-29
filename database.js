@@ -1,5 +1,3 @@
-cd ~/Desktop/AI\ projects/Advanced\ SERP\ Tracker
-cat > database.js << 'EOF'
 const { Pool } = require('pg');
 
 // Database connection pool
@@ -85,4 +83,3 @@ module.exports = {
     initDatabase,
     testConnection
 };
-EOF
