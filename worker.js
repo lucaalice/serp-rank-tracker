@@ -1,11 +1,9 @@
-cat > worker.js << 'EOF'
 const axios = require('axios');
 const { pool, initDatabase } = require('./database');
 
 const VALUESERP_API_KEY = process.env.VALUESERP_API_KEY;
 const VALUESERP_API_URL = 'https://api.valueserp.com/search';
 
-// Country to Google domain mapping
 const COUNTRY_DOMAINS = {
     'United States': 'google.com',
     'United Kingdom': 'google.co.uk',
@@ -24,10 +22,7 @@ async function checkRankings() {
     }
     
     try {
-        // Initialize database
         await initDatabase();
-        
-        // Get all keywords to check
         const result = await pool.query('SELECT * FROM keywords ORDER BY last_checked ASC NULLS FIRST');
         const keywords = result.rows;
         
@@ -41,16 +36,12 @@ async function checkRankings() {
         let checked = 0;
         let errors = 0;
         
-        // Process keywords with delay to respect API rate limits
         for (const kw of keywords) {
             try {
                 const rank = await getRankForKeyword(kw);
                 await updateKeywordRank(kw.id, rank);
                 checked++;
-                
                 console.log(`✓ ${kw.keyword} (${kw.domain}): Rank ${rank || 'Not Found'}`);
-                
-                // Add delay between requests (1 second)
                 await delay(1000);
             } catch (error) {
                 console.error(`✗ Error checking ${kw.keyword}:`, error.message);
@@ -66,7 +57,6 @@ async function checkRankings() {
         console.error('❌ Fatal error during ranking check:', error);
         process.exit(1);
     } finally {
-        // Close database connection
         await pool.end();
     }
 }
@@ -170,4 +160,3 @@ checkRankings().catch(error => {
     console.error('❌ Worker failed:', error);
     process.exit(1);
 });
-EOF
