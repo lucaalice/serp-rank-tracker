@@ -102,6 +102,32 @@ function applyFilters() {
     sortKeywords();
     renderTable();
     updateResultsCount();
+    updateFilteredKPIs();
+}
+
+function updateFilteredKPIs() {
+    // Calculate KPIs for filtered keywords only
+    const rankedKeywords = filteredKeywords.filter(kw => kw.current_rank !== null);
+    
+    const avgRank = rankedKeywords.length > 0
+        ? rankedKeywords.reduce((sum, kw) => sum + kw.current_rank, 0) / rankedKeywords.length
+        : null;
+    
+    const top10Count = filteredKeywords.filter(kw => kw.current_rank && kw.current_rank <= 10).length;
+    
+    const lastChecked = filteredKeywords.reduce((latest, kw) => {
+        if (!kw.last_checked) return latest;
+        const kwDate = new Date(kw.last_checked);
+        return !latest || kwDate > latest ? kwDate : latest;
+    }, null);
+    
+    // Update KPI cards
+    avgRankEl.textContent = avgRank ? avgRank.toFixed(1) : '-';
+    top10El.textContent = top10Count || '0';
+    totalKeywordsEl.textContent = filteredKeywords.length || '0';
+    lastUpdateEl.textContent = lastChecked 
+        ? lastChecked.toLocaleString() 
+        : 'Never';
 }
 
 function sortKeywords() {
