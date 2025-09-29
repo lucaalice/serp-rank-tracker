@@ -21,8 +21,11 @@ const resultsCountEl = document.getElementById('results-count');
 
 const selectAllCheckbox = document.getElementById('select-all');
 const exportBtn = document.getElementById('export-btn');
+const trendPeriodSelect = document.getElementById('trend-period');
+const trendChartCanvas = document.getElementById('trend-chart');
 
 let historyChart;
+let trendChart;
 let allKeywords = [];
 let filteredKeywords = [];
 let currentSort = { column: 'keyword', direction: 'asc' };
@@ -45,9 +48,10 @@ async function fetchDashboardData() {
         allKeywords = await keywordsRes.json();
         filteredKeywords = allKeywords; // Initialize filtered with all
         
-        updateKpiCards(summary)
+        updateKpiCards(summary);
         populateFilters(allKeywords);
         applyFilters();
+        fetchTrendData();
         
     } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -55,10 +59,13 @@ async function fetchDashboardData() {
     }
 }
 
-function updateKpiCards(summary) {  // Changed from "ffunction" to "function"
+function updateKpiCards(summary) {
     avgRankEl.textContent = summary.averageRank ? summary.averageRank.toFixed(1) : '-';
     top10El.textContent = summary.top10Count || '0';
     totalKeywordsEl.textContent = summary.totalKeywords || '0';
+    lastUpdateEl.textContent = summary.lastChecked 
+        ? new Date(summary.lastChecked).toLocaleString() 
+        : 'Never';
 }
 
 function populateFilters(keywords) {
@@ -136,6 +143,142 @@ function updateRankDistribution() {
     document.getElementById('dist-21-50').textContent = dist21_50;
     document.getElementById('dist-51-100').textContent = dist51_100;
     document.getElementById('dist-unranked').textContent = distUnranked;
+}
+
+// Fetch and Render Trend Data
+async function fetchTrendData() {
+    const days = parseInt(trendPeriodSelect.value);
+    const country = filterCountry.value;
+    const domain = filterDomain.value;
+    
+    try {
+        // Get all keyword IDs from filtered keywords
+        const keywordIds = filteredKeywords.map(kw => kw.id);
+        
+        if (keywordIds.length === 0) {
+            renderEmptyTrend();
+            return;
+        }
+        
+        // Fetch history for all keywords
+        const historyPromises = keywordIds.map(id => 
+            fetch(`/api/history/${id}`).then(r => r.json()).catch(() => [])
+        );
+        
+        const allHistories = await Promise.all(historyPromises);
+        
+        // Aggregate data by date
+        const dateMap = new Map();
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - days);
+        
+        allHistories.forEach(history => {
+            history.forEach(entry => {
+                const date = new Date(entry.checked_at);
+                if (date >= cutoffDate) {
+                    const dateKey = date.toISOString().split('T')[0];
+                    if (!dateMap.has(dateKey)) {
+                        dateMap.set(dateKey, []);
+                    }
+                    dateMap.get(dateKey).push(entry.rank);
+                }
+            });
+        });
+        
+        // Calculate average for each date
+        const sortedDates = Array.from(dateMap.keys()).sort();
+        const avgRanks = sortedDates.map(date => {
+            const ranks = dateMap.get(date);
+            return ranks.reduce((sum, r) => sum + r, 0) / ranks.length;
+        });
+        
+        renderTrendChart(sortedDates, avgRanks);
+        
+    } catch (error) {
+        console.error('Error fetching trend data:', error);
+        renderEmptyTrend();
+    }
+}
+
+function renderTrendChart(dates, avgRanks) {
+    if (trendChart) {
+        trendChart.destroy();
+    }
+    
+    if (dates.length === 0) {
+        renderEmptyTrend();
+        return;
+    }
+    
+    const labels = dates.map(d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+    
+    trendChart = new Chart(trendChartCanvas, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Average Position',
+                data: avgRanks,
+                borderColor: 'rgb(59, 130, 246)',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: {
+                    reverse: true,
+                    beginAtZero: false,
+                    title: { 
+                        display: true, 
+                        text: 'Average Rank',
+                        font: { size: 12 }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        maxRotation: 0,
+                        autoSkipPadding: 20
+                    }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Avg Position: ' + context.parsed.y.toFixed(1);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderEmptyTrend() {
+    if (trendChart) {
+        trendChart.destroy();
+    }
+    trendChartCanvas.parentElement.innerHTML = `
+        <div class="text-center py-12 text-gray-500">
+            <p class="text-sm">No historical data available yet</p>
+            <p class="text-xs mt-1">Data will appear after the worker checks your keywords</p>
+        </div>
+        <canvas id="trend-chart" height="80" style="display:none;"></canvas>
+    `;
 }
 
 function sortKeywords() {
@@ -441,10 +584,13 @@ document.querySelectorAll('.sortable').forEach(header => {
 });
 
 // Filters
-filterCountry.addEventListener('change', () => { currentPage = 1; applyFilters(); });
-filterDomain.addEventListener('change', () => { currentPage = 1; applyFilters(); });
+filterCountry.addEventListener('change', () => { currentPage = 1; applyFilters(); fetchTrendData(); });
+filterDomain.addEventListener('change', () => { currentPage = 1; applyFilters(); fetchTrendData(); });
 filterRank.addEventListener('change', () => { currentPage = 1; applyFilters(); });
 searchInput.addEventListener('input', () => { currentPage = 1; applyFilters(); });
+
+// Trend period selector
+trendPeriodSelect.addEventListener('change', fetchTrendData);
 
 // Pagination
 document.getElementById('prev-page').addEventListener('click', () => {
