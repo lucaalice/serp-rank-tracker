@@ -233,6 +233,17 @@ function renderHistoryChart(history, keyword) {
     
     modalTitle.textContent = `Ranking History: "${keyword}"`;
     
+    // Check if there's any history data
+    if (history.length === 0) {
+        historyChartCanvas.parentElement.innerHTML = `
+            <div class="text-center py-12 text-gray-500">
+                <p class="text-lg font-medium">No ranking history yet</p>
+                <p class="text-sm mt-2">This keyword hasn't been checked by the worker yet.</p>
+            </div>
+        `;
+        return;
+    }
+    
     const labels = history.map(h => new Date(h.checked_at).toLocaleDateString());
     const data = history.map(h => h.rank);
     
