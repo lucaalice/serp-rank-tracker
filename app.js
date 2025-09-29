@@ -43,7 +43,7 @@ async function fetchDashboardData() {
 
         const summary = await summaryRes.json();
         allKeywords = await keywordsRes.json();
-        filteredKeywords = allKeywords;
+        filteredKeywords = allKeywords; // Initialize filtered with all
         
         updateKpiCards(summary);
         populateFilters(allKeywords);
@@ -59,6 +59,9 @@ function updateKpiCards(summary) {
     avgRankEl.textContent = summary.averageRank ? summary.averageRank.toFixed(1) : '-';
     top10El.textContent = summary.top10Count || '0';
     totalKeywordsEl.textContent = summary.totalKeywords || '0';
+    lastUpdateEl.textContent = summary.lastChecked 
+        ? new Date(summary.lastChecked).toLocaleString() 
+        : 'Never';
 }
 
 function populateFilters(keywords) {
@@ -118,6 +121,24 @@ function updateFilteredKPIs() {
     top3El.textContent = top3Count || '0';
     top10El.textContent = top10Count || '0';
     totalKeywordsEl.textContent = filteredKeywords.length || '0';
+    
+    updateRankDistribution();
+}
+
+function updateRankDistribution() {
+    const dist1_3 = filteredKeywords.filter(kw => kw.current_rank && kw.current_rank >= 1 && kw.current_rank <= 3).length;
+    const dist4_10 = filteredKeywords.filter(kw => kw.current_rank && kw.current_rank >= 4 && kw.current_rank <= 10).length;
+    const dist11_20 = filteredKeywords.filter(kw => kw.current_rank && kw.current_rank >= 11 && kw.current_rank <= 20).length;
+    const dist21_50 = filteredKeywords.filter(kw => kw.current_rank && kw.current_rank >= 21 && kw.current_rank <= 50).length;
+    const dist51_100 = filteredKeywords.filter(kw => kw.current_rank && kw.current_rank >= 51 && kw.current_rank <= 100).length;
+    const distUnranked = filteredKeywords.filter(kw => !kw.current_rank || kw.current_rank > 100).length;
+    
+    document.getElementById('dist-1-3').textContent = dist1_3;
+    document.getElementById('dist-4-10').textContent = dist4_10;
+    document.getElementById('dist-11-20').textContent = dist11_20;
+    document.getElementById('dist-21-50').textContent = dist21_50;
+    document.getElementById('dist-51-100').textContent = dist51_100;
+    document.getElementById('dist-unranked').textContent = distUnranked;
 }
 
 function sortKeywords() {
@@ -125,9 +146,11 @@ function sortKeywords() {
         let aVal = a[currentSort.column];
         let bVal = b[currentSort.column];
         
+        // Handle null values
         if (aVal === null || aVal === undefined) return 1;
         if (bVal === null || bVal === undefined) return -1;
         
+        // String comparison
         if (typeof aVal === 'string') {
             aVal = aVal.toLowerCase();
             bVal = bVal.toLowerCase();
@@ -247,9 +270,9 @@ function renderHistoryChart(history, keyword) {
     
     modalTitle.textContent = `Ranking History: "${keyword}"`;
     
+    // Check if there's any history data
     if (history.length === 0) {
-        const chartContainer = document.getElementById('chart-container');
-        chartContainer.innerHTML = `
+        historyChartCanvas.parentElement.innerHTML = `
             <div class="text-center py-12 text-gray-500">
                 <p class="text-lg font-medium">No ranking history yet</p>
                 <p class="text-sm mt-2">This keyword hasn't been checked by the worker yet.</p>
@@ -333,6 +356,7 @@ function exportToCSV() {
 // Event Listeners
 document.addEventListener('DOMContentLoaded', fetchDashboardData);
 
+// Toggle add keywords panel
 addKeywordsToggle.addEventListener('click', () => {
     addKeywordsPanel.classList.toggle('hidden');
 });
@@ -371,7 +395,6 @@ addKeywordsForm.addEventListener('submit', async (e) => {
         }
         
         addKeywordsForm.reset();
-        addKeywordsPanel.classList.add('hidden');
         fetchDashboardData();
         alert(`Successfully added ${keywords.length} keywords!`);
 
@@ -389,7 +412,7 @@ keywordsTableBody.addEventListener('click', async (e) => {
         const keyword = target.dataset.keyword;
         const history = await fetchHistory(id);
         renderHistoryChart(history, keyword);
-        historyModal.style.display = 'flex';
+        historyModal.classList.add('is-open');
     }
     
     if (target.classList.contains('delete-btn')) {
@@ -448,13 +471,21 @@ selectAllCheckbox.addEventListener('change', (e) => {
     });
 });
 
+keywordsTableBody.addEventListener('change', (e) => {
+    if (e.target.classList.contains('keyword-checkbox')) {
+        const anyChecked = document.querySelectorAll('.keyword-checkbox:checked').length > 0;
+        // Update UI if needed
+    }
+});
+
 // Export
 exportBtn.addEventListener('click', exportToCSV);
 
 // Modal
 function closeModal() {
-    historyModal.style.display = 'none';
-    const chartContainer = document.getElementById('chart-container');
+    historyModal.classList.remove('is-open');
+    // Restore canvas if it was replaced
+    const chartContainer = document.querySelector('#history-modal .p-6');
     if (!document.getElementById('history-chart')) {
         chartContainer.innerHTML = '<canvas id="history-chart"></canvas>';
     }
@@ -467,8 +498,9 @@ historyModal.addEventListener('click', (e) => {
     }
 });
 
+// Also allow ESC key to close modal
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && historyModal.style.display === 'flex') {
+    if (e.key === 'Escape' && historyModal.classList.contains('is-open')) {
         closeModal();
     }
 });
