@@ -1,5 +1,7 @@
 // DOM Elements
 const addKeywordsForm = document.getElementById('add-keywords-form');
+const addKeywordsToggle = document.getElementById('add-keywords-toggle');
+const addKeywordsPanel = document.getElementById('add-keywords-panel');
 const keywordsTableBody = document.getElementById('keywords-table-body');
 const historyModal = document.getElementById('history-modal');
 const closeModalBtn = document.getElementById('close-modal-btn');
@@ -12,13 +14,12 @@ const filterRank = document.getElementById('filter-rank');
 const searchInput = document.getElementById('search-input');
 
 const avgRankEl = document.getElementById('avg-rank');
+const top3El = document.getElementById('top-3');
 const top10El = document.getElementById('top-10');
 const totalKeywordsEl = document.getElementById('total-keywords');
-const lastUpdateEl = document.getElementById('last-update');
 const resultsCountEl = document.getElementById('results-count');
 
 const selectAllCheckbox = document.getElementById('select-all');
-const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
 const exportBtn = document.getElementById('export-btn');
 
 let historyChart;
@@ -42,6 +43,7 @@ async function fetchDashboardData() {
 
         const summary = await summaryRes.json();
         allKeywords = await keywordsRes.json();
+        filteredKeywords = allKeywords; // Initialize filtered with all
         
         updateKpiCards(summary);
         populateFilters(allKeywords);
@@ -106,28 +108,19 @@ function applyFilters() {
 }
 
 function updateFilteredKPIs() {
-    // Calculate KPIs for filtered keywords only
     const rankedKeywords = filteredKeywords.filter(kw => kw.current_rank !== null);
     
     const avgRank = rankedKeywords.length > 0
         ? rankedKeywords.reduce((sum, kw) => sum + kw.current_rank, 0) / rankedKeywords.length
         : null;
     
+    const top3Count = filteredKeywords.filter(kw => kw.current_rank && kw.current_rank <= 3).length;
     const top10Count = filteredKeywords.filter(kw => kw.current_rank && kw.current_rank <= 10).length;
     
-    const lastChecked = filteredKeywords.reduce((latest, kw) => {
-        if (!kw.last_checked) return latest;
-        const kwDate = new Date(kw.last_checked);
-        return !latest || kwDate > latest ? kwDate : latest;
-    }, null);
-    
-    // Update KPI cards
     avgRankEl.textContent = avgRank ? avgRank.toFixed(1) : '-';
+    top3El.textContent = top3Count || '0';
     top10El.textContent = top10Count || '0';
     totalKeywordsEl.textContent = filteredKeywords.length || '0';
-    lastUpdateEl.textContent = lastChecked 
-        ? lastChecked.toLocaleString() 
-        : 'Never';
 }
 
 function sortKeywords() {
@@ -163,7 +156,7 @@ function renderTable() {
     if (pageKeywords.length === 0) {
         keywordsTableBody.innerHTML = `
             <tr>
-                <td colspan="7" class="text-center py-12 text-gray-500">
+                <td colspan="7" class="px-6 py-12 text-center text-sm text-gray-500">
                     No keywords match your filters.
                 </td>
             </tr>
@@ -173,45 +166,45 @@ function renderTable() {
 
     pageKeywords.forEach(kw => {
         const rankChange = kw.rank_change;
-        let changeHtml = `<span class="text-gray-400">-</span>`;
+        let changeHtml = `<span class="rank-neutral">-</span>`;
         
         if (rankChange < 0) {
-            changeHtml = `<span class="text-green-600 font-semibold">↑ ${Math.abs(rankChange)}</span>`;
+            changeHtml = `<span class="rank-up font-semibold">▲ ${Math.abs(rankChange)}</span>`;
         } else if (rankChange > 0) {
-            changeHtml = `<span class="text-red-600 font-semibold">↓ ${rankChange}</span>`;
+            changeHtml = `<span class="rank-down font-semibold">▼ ${rankChange}</span>`;
         }
 
-        let rankBadgeClass = 'bg-gray-100 text-gray-800';
-        if (kw.current_rank && kw.current_rank <= 10) {
-            rankBadgeClass = 'bg-green-100 text-green-800';
+        let rankClass = 'bg-gray-100 text-gray-700';
+        if (kw.current_rank && kw.current_rank <= 3) {
+            rankClass = 'bg-red-50 text-red-700 font-bold';
+        } else if (kw.current_rank && kw.current_rank <= 10) {
+            rankClass = 'bg-orange-50 text-orange-700';
         } else if (kw.current_rank && kw.current_rank <= 20) {
-            rankBadgeClass = 'bg-blue-100 text-blue-800';
-        } else if (kw.current_rank && kw.current_rank <= 50) {
-            rankBadgeClass = 'bg-yellow-100 text-yellow-800';
+            rankClass = 'bg-yellow-50 text-yellow-700';
         }
 
         const row = `
-            <tr class="hover:bg-gray-50 transition" id="kw-row-${kw.id}">
-                <td class="px-6 py-4">
-                    <input type="checkbox" class="keyword-checkbox rounded" data-id="${kw.id}">
+            <tr class="table-row" id="kw-row-${kw.id}">
+                <td class="px-6 py-3">
+                    <input type="checkbox" class="keyword-checkbox rounded border-gray-300" data-id="${kw.id}">
                 </td>
-                <td class="px-6 py-4 font-medium text-gray-900">${kw.keyword}</td>
-                <td class="px-6 py-4">
-                    <span class="rank-badge px-3 py-1 rounded-full text-sm font-bold ${rankBadgeClass}">
-                        ${kw.current_rank || 'N/A'}
+                <td class="px-6 py-3 text-sm font-medium text-gray-900">${kw.keyword}</td>
+                <td class="px-6 py-3 text-center">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded text-sm font-medium ${rankClass}">
+                        ${kw.current_rank || '-'}
                     </span>
                 </td>
-                <td class="px-6 py-4">${changeHtml}</td>
-                <td class="px-6 py-4 text-gray-600">${kw.search_volume ? kw.search_volume.toLocaleString() : '-'}</td>
-                <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" title="${kw.target_url}">
+                <td class="px-6 py-3 text-center text-sm">${changeHtml}</td>
+                <td class="px-6 py-3 text-center text-sm text-gray-600">${kw.search_volume ? kw.search_volume.toLocaleString() : '-'}</td>
+                <td class="px-6 py-3 text-sm text-gray-500 truncate max-w-xs" title="${kw.target_url}">
                     ${kw.target_url}
                 </td>
-                <td class="px-6 py-4">
-                    <button class="view-btn text-blue-600 hover:text-blue-800 font-medium mr-3" 
+                <td class="px-6 py-3 text-center">
+                    <button class="view-btn text-blue-600 hover:text-blue-700 text-sm font-medium mr-3" 
                         data-id="${kw.id}" data-keyword="${kw.keyword}">
                         View
                     </button>
-                    <button class="delete-btn text-red-600 hover:text-red-800 font-medium" 
+                    <button class="delete-btn text-red-600 hover:text-red-700 text-sm font-medium" 
                         data-id="${kw.id}">
                         Delete
                     </button>
@@ -345,6 +338,11 @@ function exportToCSV() {
 // Event Listeners
 document.addEventListener('DOMContentLoaded', fetchDashboardData);
 
+// Toggle add keywords panel
+addKeywordsToggle.addEventListener('click', () => {
+    addKeywordsPanel.classList.toggle('hidden');
+});
+
 addKeywordsForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const domain = document.getElementById('domain').value;
@@ -453,40 +451,12 @@ selectAllCheckbox.addEventListener('change', (e) => {
     document.querySelectorAll('.keyword-checkbox').forEach(cb => {
         cb.checked = e.target.checked;
     });
-    updateBulkDeleteBtn();
 });
 
 keywordsTableBody.addEventListener('change', (e) => {
     if (e.target.classList.contains('keyword-checkbox')) {
-        updateBulkDeleteBtn();
-    }
-});
-
-function updateBulkDeleteBtn() {
-    const selected = document.querySelectorAll('.keyword-checkbox:checked').length;
-    if (selected > 0) {
-        bulkDeleteBtn.classList.remove('hidden');
-        bulkDeleteBtn.textContent = `Delete Selected (${selected})`;
-    } else {
-        bulkDeleteBtn.classList.add('hidden');
-    }
-}
-
-bulkDeleteBtn.addEventListener('click', async () => {
-    const selected = Array.from(document.querySelectorAll('.keyword-checkbox:checked'))
-        .map(cb => cb.dataset.id);
-    
-    if (!confirm(`Delete ${selected.length} keywords?`)) return;
-    
-    try {
-        await Promise.all(selected.map(id => 
-            fetch(`/api/keywords/${id}`, { method: 'DELETE' })
-        ));
-        fetchDashboardData();
-        bulkDeleteBtn.classList.add('hidden');
-    } catch (error) {
-        console.error('Error deleting keywords:', error);
-        alert('Some keywords could not be deleted.');
+        const anyChecked = document.querySelectorAll('.keyword-checkbox:checked').length > 0;
+        // Update UI if needed
     }
 });
 
