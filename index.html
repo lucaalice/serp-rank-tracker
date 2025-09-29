@@ -27,6 +27,34 @@
             </button>
         </header>
 
+        <!-- Filters Section - Top Priority -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
+            <div class="flex flex-col lg:flex-row gap-4 items-center justify-between">
+                <h2 class="text-xl font-bold text-gray-900">Dashboard Filters</h2>
+                <div class="flex gap-3 flex-wrap">
+                    <input type="text" id="search-input" 
+                        class="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                        placeholder="Search keywords...">
+                    <select id="filter-country" 
+                        class="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">All Countries</option>
+                    </select>
+                    <select id="filter-domain" 
+                        class="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">All Domains</option>
+                    </select>
+                    <select id="filter-rank" 
+                        class="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">All Ranks</option>
+                        <option value="1-10">Top 10</option>
+                        <option value="11-20">11-20</option>
+                        <option value="21-50">21-50</option>
+                        <option value="51-100">51-100</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <!-- KPI Cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
@@ -111,30 +139,6 @@
                 <div class="bg-white rounded-xl shadow-sm border border-gray-200">
                     <!-- Filters & Search -->
                     <div class="p-6 border-b border-gray-200">
-                        <div class="flex flex-col lg:flex-row gap-4 items-center justify-between mb-4">
-                            <h2 class="text-2xl font-bold text-gray-900">Tracked Keywords</h2>
-                            <div class="flex gap-3 flex-wrap">
-                                <input type="text" id="search-input" 
-                                    class="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
-                                    placeholder="Search keywords...">
-                                <select id="filter-country" 
-                                    class="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                    <option value="">All Countries</option>
-                                </select>
-                                <select id="filter-domain" 
-                                    class="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                    <option value="">All Domains</option>
-                                </select>
-                                <select id="filter-rank" 
-                                    class="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                    <option value="">All Ranks</option>
-                                    <option value="1-10">Top 10</option>
-                                    <option value="11-20">11-20</option>
-                                    <option value="21-50">21-50</option>
-                                    <option value="51-100">51-100</option>
-                                </select>
-                            </div>
-                        </div>
                         <div class="flex items-center gap-4 text-sm text-gray-600">
                             <span id="results-count">0 keywords</span>
                             <button id="bulk-delete-btn" class="text-red-600 hover:text-red-700 font-medium hidden">
