@@ -45,7 +45,7 @@ async function fetchDashboardData() {
         allKeywords = await keywordsRes.json();
         filteredKeywords = allKeywords; // Initialize filtered with all
         
-        updateKpiCards(summary);
+        updateKpiCards(summary)
         populateFilters(allKeywords);
         applyFilters();
         
@@ -55,7 +55,7 @@ async function fetchDashboardData() {
     }
 }
 
-ffunction updateKpiCards(summary) {
+function updateKpiCards(summary) {  // Changed from "ffunction" to "function"
     avgRankEl.textContent = summary.averageRank ? summary.averageRank.toFixed(1) : '-';
     top10El.textContent = summary.top10Count || '0';
     totalKeywordsEl.textContent = summary.totalKeywords || '0';
