@@ -1,19 +1,16 @@
 const { Pool } = require('pg');
 
-// Database connection pool
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// Initialize database tables
 async function initDatabase() {
     const client = await pool.connect();
     
     try {
         console.log('🔧 Initializing database...');
         
-        // Create keywords table
         await client.query(`
             CREATE TABLE IF NOT EXISTS keywords (
                 id SERIAL PRIMARY KEY,
@@ -30,7 +27,6 @@ async function initDatabase() {
             )
         `);
         
-        // Create ranking_history table
         await client.query(`
             CREATE TABLE IF NOT EXISTS ranking_history (
                 id SERIAL PRIMARY KEY,
@@ -40,7 +36,6 @@ async function initDatabase() {
             )
         `);
         
-        // Create indexes for better performance
         await client.query(`
             CREATE INDEX IF NOT EXISTS idx_keywords_domain ON keywords(domain);
         `);
@@ -66,7 +61,6 @@ async function initDatabase() {
     }
 }
 
-// Test database connection
 async function testConnection() {
     try {
         const result = await pool.query('SELECT NOW()');
