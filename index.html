@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced SERP Rank Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .modal { display: none; }
+        .modal.is-open { display: flex; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Advanced SERP Rank Tracker</h1>
+            <p class="text-gray-600 mt-1">Monitor keyword performance with historical trend dashboards.</p>
+        </header>
+
+        <main>
+            <!-- KPI Cards -->
+            <div id="kpi-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <!-- Card for Average Rank -->
+                <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                    <h3 class="text-sm font-medium text-gray-500">Average Rank</h3>
+                    <p id="avg-rank" class="text-3xl font-bold mt-2">-</p>
+                </div>
+                <!-- Card for Keywords in Top 10 -->
+                <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                    <h3 class="text-sm font-medium text-gray-500">Keywords in Top 10</h3>
+                    <p id="top-10" class="text-3xl font-bold mt-2">-</p>
+                </div>
+                 <!-- Card for Total Keywords -->
+                <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                    <h3 class="text-sm font-medium text-gray-500">Total Keywords Tracked</h3>
+                    <p id="total-keywords" class="text-3xl font-bold mt-2">-</p>
+                </div>
+                 <!-- Card for Last Update -->
+                <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                    <h3 class="text-sm font-medium text-gray-500">Last Update</h3>
+                    <p id="last-update" class="text-lg font-bold mt-2">-</p>
+                </div>
+            </div>
+
+            <!-- Main Content Area -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Left Column: Add Keywords -->
+                <div class="lg:col-span-1 bg-white p-6 rounded-lg shadow-md border border-gray-200 h-fit">
+                    <h2 class="text-xl font-semibold mb-4">Bulk Add Keywords</h2>
+                    <form id="add-keywords-form">
+                        <div class="mb-4">
+                            <label for="domain" class="block text-sm font-medium text-gray-700">Domain</label>
+                            <input type="text" id="domain" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., atolls.com">
+                        </div>
+                        <div class="mb-4">
+                            <label for="country" class="block text-sm font-medium text-gray-700">Country</label>
+                            <select id="country" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500">
+                                <option>United States</option>
+                                <option>France</option>
+                                <option>Germany</option>
+                                <option>Spain</option>
+                                <option>United Kingdom</option>
+                                <option>Italy</option>
+                            </select>
+                        </div>
+                        <div class="mb-4">
+                            <label for="keywords-input" class="block text-sm font-medium text-gray-700">Keywords, Target URLs & Search Volume</label>
+                            <textarea id="keywords-input" rows="8" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-indigo-500 focus:border-indigo-500" placeholder="One per line, format:&#10;keyword, url, search_volume"></textarea>
+                            <p class="text-xs text-gray-500 mt-1">Example: best seo tool, https://atolls.com/seo, 12000</p>
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-2 px-4 rounded-md hover:bg-indigo-700">Add Keywords</button>
+                    </form>
+                </div>
+
+                <!-- Right Column: Keyword Table -->
+                <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                     <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold">Tracked Keywords</h2>
+                        <div class="flex space-x-2">
+                             <select id="filter-country" class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm">
+                                <option value="">All Countries</option>
+                             </select>
+                             <select id="filter-domain" class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm">
+                                <option value="">All Domains</option>
+                             </select>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Keyword</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Change</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Target URL</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="keywords-table-body" class="bg-white divide-y divide-gray-200">
+                                <!-- Rows will be injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- History Modal -->
+    <div id="history-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full items-center justify-center">
+        <div class="relative mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center pb-3">
+                <h3 class="text-2xl font-bold" id="modal-title">Ranking History</h3>
+                <button id="close-modal-btn" class="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <div class="mt-3">
+                <canvas id="history-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const addKeywordsForm = document.getElementById('add-keywords-form');
+        const keywordsTableBody = document.getElementById('keywords-table-body');
+        const historyModal = document.getElementById('history-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const modalTitle = document.getElementById('modal-title');
+        const historyChartCanvas = document.getElementById('history-chart');
+        
+        const filterCountry = document.getElementById('filter-country');
+        const filterDomain = document.getElementById('filter-domain');
+        
+        const avgRankEl = document.getElementById('avg-rank');
+        const top10El = document.getElementById('top-10');
+        const totalKeywordsEl = document.getElementById('total-keywords');
+        const lastUpdateEl = document.getElementById('last-update');
+
+        let historyChart;
+        let allKeywords = [];
+
+        // --- API Calls ---
+
+        async function fetchDashboardData() {
+            try {
+                // Fetch summary and keywords in parallel
+                const [summaryRes, keywordsRes] = await Promise.all([
+                    fetch('/api/summary'),
+                    fetch('/api/keywords')
+                ]);
+
+                if (!summaryRes.ok || !keywordsRes.ok) {
+                    throw new Error('Failed to fetch data');
+                }
+
+                const summary = await summaryRes.json();
+                allKeywords = await keywordsRes.json();
+                
+                updateKpiCards(summary);
+                populateFilters(allKeywords);
+                renderTable(allKeywords);
+                
+            } catch (error) {
+                console.error('Error fetching dashboard data:', error);
+                alert('Could not load dashboard data. Please check the server connection.');
+            }
+        }
+
+        async function fetchHistory(keywordId) {
+             try {
+                const res = await fetch(`/api/history/${keywordId}`);
+                if (!res.ok) throw new Error('Failed to fetch history');
+                const history = await res.json();
+                return history;
+            } catch (error) {
+                console.error('Error fetching history:', error);
+                return [];
+            }
+        }
+
+        // --- UI Updates & Rendering ---
+
+        function updateKpiCards(summary) {
+            avgRankEl.textContent = summary.averageRank ? summary.averageRank.toFixed(1) : '-';
+            top10El.textContent = summary.top10Count || '0';
+            totalKeywordsEl.textContent = summary.totalKeywords || '0';
+            lastUpdateEl.textContent = summary.lastChecked ? new Date(summary.lastChecked).toLocaleDateString() : 'Never';
+        }
+
+        function populateFilters(keywords) {
+             const countries = [...new Set(keywords.map(kw => kw.country))];
+             const domains = [...new Set(keywords.map(kw => kw.domain))];
+
+             filterCountry.innerHTML = '<option value="">All Countries</option>';
+             filterDomain.innerHTML = '<option value="">All Domains</option>';
+
+             countries.forEach(c => filterCountry.innerHTML += `<option value="${c}">${c}</option>`);
+             domains.forEach(d => filterDomain.innerHTML += `<option value="${d}">${d}</option>`);
+        }
+        
+        function renderTable(keywords) {
+            keywordsTableBody.innerHTML = '';
+            if (keywords.length === 0) {
+                keywordsTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4">No keywords are being tracked yet.</td></tr>';
+                return;
+            }
+
+            keywords.forEach(kw => {
+                const rankChange = kw.rank_change;
+                let changeHtml = `<span class="text-gray-500">-</span>`;
+                if (rankChange < 0) { // Rank improved (e.g., from 10 to 5 is -5)
+                    changeHtml = `<span class="text-green-600 font-bold">&#9650; ${Math.abs(rankChange)}</span>`;
+                } else if (rankChange > 0) { // Rank worsened
+                    changeHtml = `<span class="text-red-600 font-bold">&#9660; ${rankChange}</span>`;
+                }
+
+                const row = `
+                    <tr id="kw-row-${kw.id}">
+                        <td class="px-6 py-4 whitespace-nowrap">${kw.keyword}</td>
+                        <td class="px-6 py-4 whitespace-nowrap font-bold">${kw.current_rank || 'N/A'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${changeHtml}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate" style="max-width: 200px;" title="${kw.target_url}">${kw.target_url}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button class="view-btn text-indigo-600 hover:text-indigo-900" data-id="${kw.id}" data-keyword="${kw.keyword}">View</button>
+                            <button class="delete-btn text-red-600 hover:text-red-900 ml-4" data-id="${kw.id}">Delete</button>
+                        </td>
+                    </tr>
+                `;
+                keywordsTableBody.innerHTML += row;
+            });
+        }
+        
+        function renderHistoryChart(history, keyword) {
+            if (historyChart) {
+                historyChart.destroy();
+            }
+            modalTitle.textContent = `Ranking History for "${keyword}"`;
+            
+            const labels = history.map(h => new Date(h.checked_at).toLocaleDateString());
+            const data = history.map(h => h.rank);
+            
+            historyChart = new Chart(historyChartCanvas, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Rank',
+                        data,
+                        borderColor: 'rgb(79, 70, 229)',
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        tension: 0.1,
+                        fill: true,
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            reverse: true, // Rank 1 should be at the top
+                            beginAtZero: false,
+                            min: 1,
+                            title: { display: true, text: 'SERP Position' }
+                        },
+                        x: {
+                             title: { display: true, text: 'Date' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+        
+        function applyFilters() {
+            const country = filterCountry.value;
+            const domain = filterDomain.value;
+
+            const filteredKeywords = allKeywords.filter(kw => {
+                const countryMatch = country ? kw.country === country : true;
+                const domainMatch = domain ? kw.domain === domain : true;
+                return countryMatch && domainMatch;
+            });
+            renderTable(filteredKeywords);
+        }
+
+        // --- Event Listeners ---
+
+        document.addEventListener('DOMContentLoaded', fetchDashboardData);
+
+        addKeywordsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const domain = document.getElementById('domain').value;
+            const country = document.getElementById('country').value;
+            const keywordsInput = document.getElementById('keywords-input').value.trim();
+
+            const keywords = keywordsInput.split('\n').map(line => {
+                const parts = line.split(',').map(p => p.trim());
+                if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return null;
+                return { keyword: parts[0], target_url: parts[1], search_volume: parseInt(parts[2], 10) };
+            }).filter(Boolean);
+            
+            if (keywords.length === 0) {
+                 alert('Please enter keywords in the correct format.');
+                 return;
+            }
+
+            try {
+                const res = await fetch('/api/keywords/bulk', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ domain, country, keywords })
+                });
+
+                if (!res.ok) {
+                     const error = await res.json();
+                     throw new Error(error.error || 'Failed to add keywords');
+                }
+                
+                addKeywordsForm.reset();
+                fetchDashboardData(); // Refresh the entire dashboard
+                alert('Keywords added successfully!');
+
+            } catch (error) {
+                console.error('Error adding keywords:', error);
+                alert(`Error: ${error.message}`);
+            }
+        });
+
+        keywordsTableBody.addEventListener('click', async (e) => {
+            const target = e.target;
+            const id = target.dataset.id;
+            
+            // View history
+            if (target.classList.contains('view-btn')) {
+                const keyword = target.dataset.keyword;
+                const history = await fetchHistory(id);
+                renderHistoryChart(history, keyword);
+                historyModal.classList.add('is-open');
+            }
+            
+            // Delete keyword
+            if (target.classList.contains('delete-btn')) {
+                if (!confirm('Are you sure you want to delete this keyword and all its history?')) return;
+                
+                try {
+                     const res = await fetch(`/api/keywords/${id}`, { method: 'DELETE' });
+                     if (!res.ok) throw new Error('Failed to delete keyword');
+                     
+                     document.getElementById(`kw-row-${id}`).remove();
+                     // A full refresh is easier than trying to update KPIs manually
+                     fetchDashboardData();
+                     
+                } catch (error) {
+                     console.error('Error deleting keyword:', error);
+                     alert('Could not delete keyword.');
+                }
+            }
+        });
+
+        closeModalBtn.addEventListener('click', () => historyModal.classList.remove('is-open'));
+        historyModal.addEventListener('click', (e) => {
+            if (e.target === historyModal) {
+                 historyModal.classList.remove('is-open');
+            }
+        });
+        
+        filterCountry.addEventListener('change', applyFilters);
+        filterDomain.addEventListener('change', applyFilters);
+
+    </script>
+</body>
+</html>
+

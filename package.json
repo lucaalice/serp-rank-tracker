@@ -1,0 +1,30 @@
+{
+  "name": "advanced-serp-rank-tracker",
+  "version": "2.0.0",
+  "description": "Professional SERP rank tracking application with interactive dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "worker": "node worker.js",
+    "dev": "nodemon server.js"
+  },
+  "keywords": [
+    "seo",
+    "serp",
+    "rank-tracker",
+    "dashboard"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.11.3",
+    "axios": "^1.6.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
