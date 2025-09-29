@@ -55,13 +55,10 @@ async function fetchDashboardData() {
     }
 }
 
-function updateKpiCards(summary) {
+ffunction updateKpiCards(summary) {
     avgRankEl.textContent = summary.averageRank ? summary.averageRank.toFixed(1) : '-';
     top10El.textContent = summary.top10Count || '0';
     totalKeywordsEl.textContent = summary.totalKeywords || '0';
-    lastUpdateEl.textContent = summary.lastChecked 
-        ? new Date(summary.lastChecked).toLocaleString() 
-        : 'Never';
 }
 
 function populateFilters(keywords) {
