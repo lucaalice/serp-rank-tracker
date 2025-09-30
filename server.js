@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const { pool, initDatabase } = require('./database');
 
 const app = express();
@@ -16,10 +17,17 @@ let workerProgress = {
 };
 
 app.use(express.json({ limit: '50mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
 
 initDatabase().catch(console.error);
 
+// Explicitly serve app.js as JavaScript
+app.get('/app.js', (req, res) => {
+    const filePath = path.join(__dirname, 'app.js');
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    fs.createReadStream(filePath).pipe(res);
+});
+
+// API routes (all your existing routes here - I'll include them below)
 app.get('/api/summary', async (req, res) => {
     try {
         const result = await pool.query(`
@@ -175,8 +183,9 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// Serve index.html for root - MUST BE LAST
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.listen(PORT, () => {
