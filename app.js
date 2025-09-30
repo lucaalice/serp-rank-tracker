@@ -49,6 +49,7 @@ const csvProgressText = document.getElementById('csv-progress-text');
 
 let historyChart;
 let trendChart;
+let visibilityCharts = {}; // Store visibility charts
 let allKeywords = [];
 let filteredKeywords = [];
 let currentSort = { column: 'keyword', direction: 'asc' };
@@ -77,6 +78,7 @@ async function fetchDashboardData() {
         populateFilters(allKeywords);
         applyFilters();
         fetchTrendData();
+        fetchDomainVisibilityData();
         
     } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -241,7 +243,207 @@ function applyFilters() {
     updateFilteredKPIs();
 }
 
-function updateFilteredKPIs() {
+async function fetchDomainVisibilityData() {
+    const container = document.getElementById('visibility-trends-container');
+    container.innerHTML = '<div class="text-center py-8"><div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div><p class="text-slate-400 mt-2">Loading domain visibility trends...</p></div>';
+    
+    try {
+        // Get unique domains and countries from keywords
+        const domainCountryPairs = new Map();
+        allKeywords.forEach(kw => {
+            const key = `${kw.domain}|${kw.country}`;
+            if (!domainCountryPairs.has(key)) {
+                domainCountryPairs.set(key, { domain: kw.domain, country: kw.country });
+            }
+        });
+        
+        if (domainCountryPairs.size === 0) {
+            container.innerHTML = '';
+            return;
+        }
+        
+        container.innerHTML = '';
+        
+        // Fetch visibility data for each domain
+        for (const [key, { domain, country }] of domainCountryPairs) {
+            try {
+                const res = await fetch(`/api/sistrix/visibility/${encodeURIComponent(domain)}?country=${encodeURIComponent(country)}`);
+                
+                if (!res.ok) {
+                    console.error(`Failed to fetch Sistrix data for ${domain}`);
+                    continue;
+                }
+                
+                const data = await res.json();
+                
+                if (data && data.length > 0) {
+                    renderDomainVisibilityChart(domain, country, data, container);
+                } else {
+                    console.log(`No visibility data available for ${domain} (${country})`);
+                }
+                
+            } catch (error) {
+                console.error(`Error fetching visibility for ${domain}:`, error);
+            }
+        }
+        
+        if (container.children.length === 0) {
+            container.innerHTML = `
+                <div class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700 rounded-2xl p-8 text-center shadow-2xl">
+                    <div class="text-slate-400">
+                        <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        <p class="text-lg font-medium text-white mb-2">No Sistrix Data Available</p>
+                        <p class="text-sm">Visibility trends will appear here when data is available from Sistrix</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+    } catch (error) {
+        console.error('Error fetching visibility data:', error);
+        container.innerHTML = `
+            <div class="bg-red-900/20 border border-red-700 rounded-2xl p-8 text-center">
+                <p class="text-red-400">Failed to load domain visibility data</p>
+            </div>
+        `;
+    }
+}
+
+function renderDomainVisibilityChart(domain, country, data, container) {
+    const chartId = `visibility-chart-${domain.replace(/\./g, '-')}-${country}`;
+    
+    // Create chart container
+    const chartDiv = document.createElement('div');
+    chartDiv.className = 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700 rounded-2xl p-8 mb-6 shadow-2xl';
+    chartDiv.innerHTML = `
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h3 class="text-xl font-bold text-white mb-1 flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                    </div>
+                    Domain Visibility Index - ${domain}
+                </h3>
+                <p class="text-sm text-slate-400 ml-13">${country} • Powered by Sistrix</p>
+            </div>
+            <div class="text-right">
+                <p class="text-xs text-slate-500">Current Visibility</p>
+                <p class="text-2xl font-bold text-purple-400">${data[data.length - 1].value.toFixed(2)}</p>
+            </div>
+        </div>
+        <div class="bg-slate-800/50 rounded-xl p-6 backdrop-blur-sm border border-slate-700/50">
+            <canvas id="${chartId}" height="70"></canvas>
+        </div>
+    `;
+    
+    container.appendChild(chartDiv);
+    
+    // Prepare chart data
+    const labels = data.map(d => {
+        const date = new Date(d.date);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
+    const values = data.map(d => parseFloat(d.value));
+    
+    // Calculate trend
+    const firstValue = values[0];
+    const lastValue = values[values.length - 1];
+    const change = lastValue - firstValue;
+    const changePercent = ((change / firstValue) * 100).toFixed(1);
+    
+    // Create chart
+    const ctx = document.getElementById(chartId);
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Visibility Index',
+                data: values,
+                borderColor: 'rgb(168, 85, 247)',
+                backgroundColor: function(context) {
+                    const chart = context.chart;
+                    const {ctx, chartArea} = chart;
+                    if (!chartArea) return null;
+                    const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                    gradient.addColorStop(0, 'rgba(168, 85, 247, 0)');
+                    gradient.addColorStop(1, 'rgba(168, 85, 247, 0.3)');
+                    return gradient;
+                },
+                tension: 0.4,
+                fill: true,
+                pointRadius: 4,
+                pointHoverRadius: 7,
+                pointBackgroundColor: 'rgb(168, 85, 247)',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointHoverBackgroundColor: 'rgb(192, 132, 252)',
+                pointHoverBorderColor: '#fff',
+                pointHoverBorderWidth: 3,
+                borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { 
+                        display: true, 
+                        text: 'Visibility Index', 
+                        font: { size: 14, weight: 'bold' },
+                        color: '#94a3b8'
+                    },
+                    grid: { 
+                        color: 'rgba(148, 163, 184, 0.1)',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        color: '#94a3b8',
+                        font: { size: 12 }
+                    }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { 
+                        maxRotation: 45,
+                        autoSkipPadding: 15,
+                        color: '#94a3b8',
+                        font: { size: 11 }
+                    }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    titleColor: '#fff',
+                    bodyColor: '#e2e8f0',
+                    borderColor: 'rgb(168, 85, 247)',
+                    borderWidth: 2,
+                    padding: 12,
+                    displayColors: false,
+                    callbacks: {
+                        label: function(context) {
+                            return 'Visibility: ' + context.parsed.y.toFixed(2);
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    visibilityCharts[chartId] = chart;
+}
     const rankedKeywords = filteredKeywords.filter(kw => kw.current_rank !== null);
     
     const avgRank = rankedKeywords.length > 0

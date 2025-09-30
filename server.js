@@ -191,6 +191,52 @@ app.post('/api/worker/progress', (req, res) => {
     res.json({ success: true });
 });
 
+// GET /api/sistrix/visibility/:domain - Get visibility data from Sistrix
+app.get('/api/sistrix/visibility/:domain', async (req, res) => {
+    const { domain } = req.params;
+    const { country } = req.query;
+    
+    const SISTRIX_API_KEY = process.env.SISTRIX_API_KEY || 'C9mgcKkBFYz75TxSeAYkpEHdbKrvkmV6Lg9T';
+    
+    try {
+        const axios = require('axios');
+        
+        // Map country names to Sistrix country codes
+        const countryMap = {
+            'United States': 'us',
+            'United Kingdom': 'uk',
+            'France': 'fr',
+            'Germany': 'de',
+            'Spain': 'es',
+            'Italy': 'it'
+        };
+        
+        const countryCode = countryMap[country] || 'us';
+        
+        // Fetch visibility index history (last 90 days)
+        const response = await axios.get('https://api.sistrix.com/domain.sichtbarkeitsindex', {
+            params: {
+                api_key: SISTRIX_API_KEY,
+                domain: domain,
+                country: countryCode,
+                format: 'json'
+            },
+            timeout: 10000
+        });
+        
+        if (response.data && response.data.answer && response.data.answer[0]) {
+            const data = response.data.answer[0].sichtbarkeitsindex || [];
+            res.json(data);
+        } else {
+            res.json([]);
+        }
+        
+    } catch (error) {
+        console.error('Sistrix API error:', error.message);
+        res.status(500).json({ error: 'Failed to fetch Sistrix data', message: error.message });
+    }
+});
+
 // Serve the HTML file
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
