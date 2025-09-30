@@ -18,7 +18,15 @@ let workerProgress = {
 
 // Middleware
 app.use(express.json({ limit: '50mb' }));
-app.use(express.static(path.join(__dirname)));
+
+// Serve static files with proper MIME types
+app.use(express.static(__dirname, {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.js')) {
+            res.setHeader('Content-Type', 'application/javascript');
+        }
+    }
+}));
 
 // Initialize database on startup
 initDatabase().catch(console.error);
@@ -237,18 +245,18 @@ app.get('/api/sistrix/visibility/:domain', async (req, res) => {
     }
 });
 
-// Serve the HTML file
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Serve the HTML file - THIS MUST BE LAST
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 // Start server
 app.listen(PORT, () => {
-    console.log(`✅ SERP Rank Tracker server running on port ${PORT}`);
-    console.log(`📊 Dashboard: http://localhost:${PORT}`);
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Dashboard: http://localhost:${PORT}`);
 });
