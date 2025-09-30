@@ -778,7 +778,6 @@ addKeywordsForm.addEventListener('submit', async (e) => {
 
     } catch (error) {
         console.error('Error adding keywords:', error);
-        alert(`Error:
         alert(`Error: ${error.message}`);
     }
 });
@@ -806,7 +805,7 @@ keywordsTableBody.addEventListener('click', async (e) => {
             alert('Could not delete keyword.');
         }
     }
-}
+});
 
 // CSV Upload Event Listeners
 uploadCsvBtn.addEventListener('click', openCsvModal);
