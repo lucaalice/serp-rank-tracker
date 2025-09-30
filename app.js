@@ -171,6 +171,32 @@ function updateKpiCards(summary) {
     avgRankEl.textContent = summary.averageRank ? summary.averageRank.toFixed(1) : '-';
     top10El.textContent = summary.top10Count || '0';
     totalKeywordsEl.textContent = summary.totalKeywords || '0';
+    
+    // Update last refresh time
+    if (summary.lastChecked) {
+        const lastChecked = new Date(summary.lastChecked);
+        const now = new Date();
+        const diffMs = now - lastChecked;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        let timeAgo;
+        if (diffMins < 1) {
+            timeAgo = 'Just now';
+        } else if (diffMins < 60) {
+            timeAgo = `${diffMins}m ago`;
+        } else if (diffHours < 24) {
+            timeAgo = `${diffHours}h ago`;
+        } else {
+            timeAgo = `${diffDays}d ago`;
+        }
+        
+        lastRefreshTimeEl.textContent = timeAgo;
+        lastRefreshTimeEl.title = lastChecked.toLocaleString();
+    } else {
+        lastRefreshTimeEl.textContent = 'Never';
+    }
 }
 
 function populateFilters(keywords) {
@@ -317,32 +343,74 @@ function renderTrendChart(dates, avgRanks) {
                 label: 'Average Position',
                 data: avgRanks,
                 borderColor: 'rgb(59, 130, 246)',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                backgroundColor: function(context) {
+                    const chart = context.chart;
+                    const {ctx, chartArea} = chart;
+                    if (!chartArea) return null;
+                    const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                    gradient.addColorStop(0, 'rgba(59, 130, 246, 0)');
+                    gradient.addColorStop(1, 'rgba(59, 130, 246, 0.3)');
+                    return gradient;
+                },
                 tension: 0.4,
                 fill: true,
-                pointRadius: 3,
-                pointHoverRadius: 5,
-                borderWidth: 2
+                pointRadius: 5,
+                pointHoverRadius: 8,
+                pointBackgroundColor: 'rgb(59, 130, 246)',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 3,
+                pointHoverBackgroundColor: 'rgb(99, 102, 241)',
+                pointHoverBorderColor: '#fff',
+                pointHoverBorderWidth: 4,
+                borderWidth: 3
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: true,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
             scales: {
                 y: {
                     reverse: true,
                     beginAtZero: false,
-                    title: { display: true, text: 'Average Rank', font: { size: 12 } },
-                    grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                    title: { 
+                        display: true, 
+                        text: 'Average Rank', 
+                        font: { size: 14, weight: 'bold' },
+                        color: '#94a3b8'
+                    },
+                    grid: { 
+                        color: 'rgba(148, 163, 184, 0.1)',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        color: '#94a3b8',
+                        font: { size: 12 }
+                    }
                 },
                 x: {
                     grid: { display: false },
-                    ticks: { maxRotation: 0, autoSkipPadding: 20 }
+                    ticks: { 
+                        maxRotation: 0, 
+                        autoSkipPadding: 20,
+                        color: '#94a3b8',
+                        font: { size: 12 }
+                    }
                 }
             },
             plugins: {
                 legend: { display: false },
                 tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    titleColor: '#fff',
+                    bodyColor: '#e2e8f0',
+                    borderColor: 'rgb(59, 130, 246)',
+                    borderWidth: 2,
+                    padding: 12,
+                    displayColors: false,
                     callbacks: {
                         label: function(context) {
                             return 'Avg Position: ' + context.parsed.y.toFixed(1);
