@@ -23,6 +23,7 @@ const selectAllCheckbox = document.getElementById('select-all');
 const exportBtn = document.getElementById('export-btn');
 const trendPeriodSelect = document.getElementById('trend-period');
 const trendChartCanvas = document.getElementById('trend-chart');
+const lastRefreshTimeEl = document.getElementById('last-refresh-time');
 
 // Worker Progress Elements
 const workerStatusCard = document.getElementById('worker-status-card');
