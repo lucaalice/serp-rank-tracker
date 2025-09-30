@@ -24,6 +24,14 @@ const exportBtn = document.getElementById('export-btn');
 const trendPeriodSelect = document.getElementById('trend-period');
 const trendChartCanvas = document.getElementById('trend-chart');
 
+// Worker Progress Elements
+const workerStatusCard = document.getElementById('worker-status-card');
+const workerStatusBadge = document.getElementById('worker-status-badge');
+const workerProgressBar = document.getElementById('worker-progress-bar');
+const workerProgressText = document.getElementById('worker-progress-text');
+const workerCurrentKeyword = document.getElementById('worker-current-keyword');
+const workerErrorCount = document.getElementById('worker-error-count');
+
 // CSV Upload Elements
 const uploadCsvBtn = document.getElementById('upload-csv-btn');
 const csvUploadModal = document.getElementById('csv-upload-modal');
@@ -46,6 +54,7 @@ let currentSort = { column: 'keyword', direction: 'asc' };
 let currentPage = 1;
 const itemsPerPage = 50;
 let parsedCsvData = null;
+let workerProgressInterval = null;
 
 // Fetch and Display Data
 async function fetchDashboardData() {
@@ -71,6 +80,89 @@ async function fetchDashboardData() {
     } catch (error) {
         console.error('Error fetching dashboard data:', error);
         alert('Could not load dashboard data. Please check the server connection.');
+    }
+}
+
+// Worker Progress Monitoring
+async function fetchWorkerProgress() {
+    try {
+        const res = await fetch('/api/worker/progress');
+        if (!res.ok) return;
+        
+        const progress = await res.json();
+        updateWorkerProgressUI(progress);
+    } catch (error) {
+        console.error('Error fetching worker progress:', error);
+    }
+}
+
+function updateWorkerProgressUI(progress) {
+    if (!progress) return;
+    
+    const { isRunning, totalKeywords, checkedKeywords, errors, currentKeyword, startTime, lastUpdate } = progress;
+    
+    if (isRunning) {
+        workerStatusCard.classList.remove('hidden');
+        workerStatusBadge.textContent = 'Running';
+        workerStatusBadge.className = 'px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700';
+        
+        const percentage = totalKeywords > 0 ? (checkedKeywords / totalKeywords) * 100 : 0;
+        workerProgressBar.style.width = `${percentage}%`;
+        workerProgressText.textContent = `${checkedKeywords} / ${totalKeywords} keywords checked`;
+        
+        if (currentKeyword) {
+            workerCurrentKeyword.textContent = `Currently checking: ${currentKeyword}`;
+        } else {
+            workerCurrentKeyword.textContent = 'Starting...';
+        }
+        
+        if (errors > 0) {
+            workerErrorCount.textContent = `${errors} error${errors > 1 ? 's' : ''}`;
+            workerErrorCount.classList.remove('hidden');
+        } else {
+            workerErrorCount.classList.add('hidden');
+        }
+    } else if (lastUpdate && Date.now() - lastUpdate < 60000) {
+        // Recently finished
+        workerStatusCard.classList.remove('hidden');
+        workerStatusBadge.textContent = 'Completed';
+        workerStatusBadge.className = 'px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700';
+        
+        workerProgressBar.style.width = '100%';
+        workerProgressText.textContent = `Completed: ${checkedKeywords} / ${totalKeywords} keywords`;
+        workerCurrentKeyword.textContent = 'Check complete';
+        
+        if (errors > 0) {
+            workerErrorCount.textContent = `${errors} error${errors > 1 ? 's' : ''}`;
+            workerErrorCount.classList.remove('hidden');
+        }
+        
+        // Refresh dashboard data after completion
+        setTimeout(() => {
+            fetchDashboardData();
+        }, 2000);
+    } else {
+        // Idle
+        workerStatusCard.classList.add('hidden');
+    }
+}
+
+function startWorkerProgressMonitoring() {
+    if (workerProgressInterval) {
+        clearInterval(workerProgressInterval);
+    }
+    
+    // Check immediately
+    fetchWorkerProgress();
+    
+    // Then check every 2 seconds
+    workerProgressInterval = setInterval(fetchWorkerProgress, 2000);
+}
+
+function stopWorkerProgressMonitoring() {
+    if (workerProgressInterval) {
+        clearInterval(workerProgressInterval);
+        workerProgressInterval = null;
     }
 }
 
@@ -532,9 +624,6 @@ function processCSVData(data) {
     }
     
     const headers = Object.keys(data[0]);
-    console.log('CSV Headers found:', headers);
-    console.log('First row data:', data[0]);
-    
     const missingColumns = requiredColumns.filter(col => !headers.includes(col));
     
     if (missingColumns.length > 0) {
@@ -557,7 +646,6 @@ function processCSVData(data) {
         }
         
         if (!keyword || !url || !domain || !country) {
-            console.warn(`Row ${index + 2} skipped - missing data:`, { keyword, url, domain, country });
             skippedRows++;
             return;
         }
@@ -565,7 +653,6 @@ function processCSVData(data) {
         try {
             new URL(url);
         } catch (e) {
-            console.warn(`Row ${index + 2} skipped - invalid URL:`, url);
             skippedRows++;
             return;
         }
@@ -585,10 +672,6 @@ function processCSVData(data) {
             search_volume: volume
         });
     });
-    
-    if (skippedRows > 0) {
-        console.warn(`Skipped ${skippedRows} invalid rows`);
-    }
     
     parsedCsvData = Object.values(grouped);
     
@@ -655,19 +738,12 @@ async function uploadCsvData() {
     for (const group of parsedCsvData) {
         try {
             const validKeywords = group.keywords.filter(kw => {
-                const isValid = kw.keyword && kw.target_url && kw.search_volume !== undefined;
-                if (!isValid) {
-                    console.warn('Skipping invalid keyword:', kw);
-                }
-                return isValid;
+                return kw.keyword && kw.target_url && kw.search_volume !== undefined;
             });
             
             if (validKeywords.length === 0) {
-                console.error('No valid keywords in group:', group);
                 throw new Error('No valid keywords found in this group');
             }
-            
-            console.log(`Found ${validKeywords.length} valid keywords out of ${group.keywords.length}`);
             
             const chunkSize = 100;
             const chunks = [];
@@ -676,13 +752,9 @@ async function uploadCsvData() {
                 chunks.push(validKeywords.slice(i, i + chunkSize));
             }
             
-            console.log(`Uploading ${group.domain} in ${chunks.length} chunk(s)`);
-            
             for (let i = 0; i < chunks.length; i++) {
                 csvProgressText.textContent = `Uploading ${group.domain} (${group.country})... Chunk ${i + 1}/${chunks.length}`;
                 csvProgressBar.style.width = `${(totalUploaded / totalKeywords) * 100}%`;
-                
-                console.log('Sending chunk:', chunks[i].slice(0, 2));
                 
                 const res = await fetch('/api/keywords/bulk', {
                     method: 'POST',
@@ -702,17 +774,14 @@ async function uploadCsvData() {
                         const errorData = JSON.parse(responseText);
                         errorMessage = errorData.error || errorMessage;
                     } catch (e) {
-                        errorMessage = `Server error (${res.status}). Check console for details.`;
+                        errorMessage = `Server error (${res.status}).`;
                     }
                     throw new Error(errorMessage);
                 }
                 
                 totalUploaded += chunks[i].length;
-                
                 await new Promise(resolve => setTimeout(resolve, 100));
             }
-            
-            console.log(`✓ Successfully uploaded ${validKeywords.length} keywords for ${group.domain}`);
             
         } catch (error) {
             console.error(`Error uploading ${group.domain}:`, error);
@@ -733,7 +802,19 @@ async function uploadCsvData() {
 }
 
 // Event Listeners
-document.addEventListener('DOMContentLoaded', fetchDashboardData);
+document.addEventListener('DOMContentLoaded', () => {
+    fetchDashboardData();
+    startWorkerProgressMonitoring();
+});
+
+// Stop monitoring when page is hidden
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        stopWorkerProgressMonitoring();
+    } else {
+        startWorkerProgressMonitoring();
+    }
+});
 
 addKeywordsToggle.addEventListener('click', () => {
     addKeywordsPanel.classList.toggle('hidden');
@@ -807,7 +888,6 @@ keywordsTableBody.addEventListener('click', async (e) => {
     }
 });
 
-// CSV Upload Event Listeners
 uploadCsvBtn.addEventListener('click', openCsvModal);
 closeCsvModal.addEventListener('click', closeCsvModalHandler);
 cancelCsvUpload.addEventListener('click', closeCsvModalHandler);
@@ -820,7 +900,6 @@ csvUploadModal.addEventListener('click', (e) => {
     }
 });
 
-// Sorting
 document.querySelectorAll('.sortable').forEach(header => {
     header.addEventListener('click', () => {
         const column = header.dataset.sort;
@@ -834,7 +913,6 @@ document.querySelectorAll('.sortable').forEach(header => {
     });
 });
 
-// Filters
 filterCountry.addEventListener('change', () => { currentPage = 1; applyFilters(); fetchTrendData(); });
 filterDomain.addEventListener('change', () => { currentPage = 1; applyFilters(); fetchTrendData(); });
 filterRank.addEventListener('change', () => { currentPage = 1; applyFilters(); });
@@ -842,7 +920,6 @@ searchInput.addEventListener('input', () => { currentPage = 1; applyFilters(); }
 
 trendPeriodSelect.addEventListener('change', fetchTrendData);
 
-// Pagination
 document.getElementById('prev-page').addEventListener('click', () => {
     if (currentPage > 1) {
         currentPage--;
@@ -857,23 +934,14 @@ document.getElementById('next-page').addEventListener('click', () => {
     }
 });
 
-// Bulk Selection
 selectAllCheckbox.addEventListener('change', (e) => {
     document.querySelectorAll('.keyword-checkbox').forEach(cb => {
         cb.checked = e.target.checked;
     });
 });
 
-keywordsTableBody.addEventListener('change', (e) => {
-    if (e.target.classList.contains('keyword-checkbox')) {
-        const anyChecked = document.querySelectorAll('.keyword-checkbox:checked').length > 0;
-    }
-});
-
-// Export
 exportBtn.addEventListener('click', exportToCSV);
 
-// Modal
 function closeModal() {
     historyModal.classList.remove('is-open');
     const chartContainer = document.querySelector('#history-modal .p-6');
@@ -889,7 +957,6 @@ historyModal.addEventListener('click', (e) => {
     }
 });
 
-// ESC key to close modals
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         if (historyModal.classList.contains('is-open')) {

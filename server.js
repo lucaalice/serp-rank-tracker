@@ -5,6 +5,17 @@ const { pool, initDatabase } = require('./database');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Store worker progress in memory
+let workerProgress = {
+    isRunning: false,
+    totalKeywords: 0,
+    checkedKeywords: 0,
+    errors: 0,
+    startTime: null,
+    lastUpdate: null,
+    currentKeyword: null
+};
+
 // Middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname)));
@@ -119,10 +130,7 @@ app.delete('/api/keywords/:id', async (req, res) => {
     try {
         await client.query('BEGIN');
         
-        // Delete history first (foreign key constraint)
         await client.query('DELETE FROM ranking_history WHERE keyword_id = $1', [id]);
-        
-        // Delete the keyword
         const result = await client.query('DELETE FROM keywords WHERE id = $1 RETURNING *', [id]);
         
         if (result.rows.length === 0) {
@@ -159,6 +167,28 @@ app.get('/api/history/:keywordId', async (req, res) => {
         console.error('Error fetching history:', error);
         res.status(500).json({ error: 'Failed to fetch ranking history' });
     }
+});
+
+// GET /api/worker/progress - Get current worker progress
+app.get('/api/worker/progress', (req, res) => {
+    res.json(workerProgress);
+});
+
+// POST /api/worker/progress - Update worker progress (called by worker)
+app.post('/api/worker/progress', (req, res) => {
+    const { isRunning, totalKeywords, checkedKeywords, errors, currentKeyword } = req.body;
+    
+    workerProgress = {
+        isRunning: isRunning !== undefined ? isRunning : workerProgress.isRunning,
+        totalKeywords: totalKeywords !== undefined ? totalKeywords : workerProgress.totalKeywords,
+        checkedKeywords: checkedKeywords !== undefined ? checkedKeywords : workerProgress.checkedKeywords,
+        errors: errors !== undefined ? errors : workerProgress.errors,
+        currentKeyword: currentKeyword !== undefined ? currentKeyword : workerProgress.currentKeyword,
+        startTime: isRunning && !workerProgress.isRunning ? Date.now() : workerProgress.startTime,
+        lastUpdate: Date.now()
+    };
+    
+    res.json({ success: true });
 });
 
 // Serve the HTML file

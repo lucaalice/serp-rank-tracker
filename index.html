@@ -18,6 +18,13 @@
         .rank-up { color: #10b981; }
         .rank-down { color: #ef4444; }
         .rank-neutral { color: #6b7280; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -56,6 +63,29 @@
 
     <div class="max-w-7xl mx-auto px-6 py-6">
         
+        <!-- Worker Status Card - Real-time Rank Check Progress -->
+        <div id="worker-status-card" class="hidden bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4 mb-6 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                    <span class="text-sm font-semibold text-gray-900">Rank Check Status:</span>
+                    <span id="worker-status-badge" class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700">Running</span>
+                </div>
+                <span id="worker-error-count" class="hidden text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded"></span>
+            </div>
+            
+            <div class="mb-2">
+                <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                    <div id="worker-progress-bar" class="bg-gradient-to-r from-blue-500 to-indigo-600 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <div class="flex items-center justify-between text-sm">
+                <span id="worker-progress-text" class="text-gray-700 font-medium">0 / 0 keywords checked</span>
+                <span id="worker-current-keyword" class="text-gray-600 italic truncate max-w-md">Initializing...</span>
+            </div>
+        </div>
+
         <!-- KPI Metrics Grid -->
         <div class="grid grid-cols-4 gap-4 mb-6">
             <div class="metric-card bg-white border border-gray-200 rounded-lg p-4">
