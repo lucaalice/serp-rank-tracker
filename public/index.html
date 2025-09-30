@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SERP Rank Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .sortable { cursor: pointer; user-select: none; }
+        .sortable:hover { background: #f9fafb; }
+        .metric-card { transition: all 0.2s; }
+        .metric-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .table-row:hover { background: #f9fafb; }
+        .rank-up { color: #10b981; }
+        .rank-down { color: #ef4444; }
+        .rank-neutral { color: #6b7280; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <!-- Top Navigation -->
+    <nav class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700 sticky top-0 z-50 shadow-lg">
+        <!-- Top Row: Brand & Main Actions -->
+        <div class="border-b border-slate-700/50">
+            <div class="max-w-7xl mx-auto px-6 py-3">
+                <div class="flex items-center justify-between">
+                    <!-- Left: Logo & Brand -->
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="text-lg font-bold text-white">SERP Rank Tracker</h1>
+                            <p class="text-xs text-slate-400">Real-time keyword monitoring</p>
+                        </div>
+                    </div>
+
+                    <!-- Right: Primary Actions -->
+                    <div class="flex items-center gap-3">
+                        <button id="export-btn" class="bg-slate-700 border border-slate-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-600 transition-all flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
+                            Export
+                        </button>
+                        <button id="upload-csv-btn" class="bg-emerald-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-emerald-700 transition-all shadow-lg hover:shadow-emerald-500/50 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                            Upload CSV
+                        </button>
+                        <button id="add-keywords-toggle" class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-medium px-5 py-2 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-blue-500/50 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                            </svg>
+                            Add Keywords
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Row: Filters & Search -->
+        <div class="max-w-7xl mx-auto px-6 py-3">
+            <div class="flex items-center justify-between">
+                <!-- Left: Filters -->
+                <div class="flex items-center gap-3">
+                    <select id="filter-domain" class="text-sm border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-700 text-white">
+                        <option value="">All Domains</option>
+                    </select>
+                    <select id="filter-country" class="text-sm border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-700 text-white">
+                        <option value="">All Countries</option>
+                    </select>
+                </div>
+
+                <!-- Center: Last Check -->
+                <div class="flex items-center gap-2 px-4 py-2 bg-slate-700/50 rounded-lg border border-slate-600/50">
+                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span class="text-xs text-slate-400">Last check:</span>
+                    <span id="last-refresh-time" class="text-xs font-bold text-white">-</span>
+                </div>
+
+                <!-- Right: Search -->
+                <div class="relative">
+                    <input type="text" id="search-input" placeholder="Search keywords..." 
+                        class="text-sm border border-slate-600 rounded-lg pl-10 pr-4 py-2 w-80 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-700 text-white placeholder-slate-400">
+                    <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-6 py-6">
+        
+        <!-- Worker Status Card - Real-time Rank Check Progress -->
+        <div id="worker-status-card" class="hidden bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4 mb-6 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                    <span class="text-sm font-semibold text-gray-900">Rank Check Status:</span>
+                    <span id="worker-status-badge" class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700">Running</span>
+                </div>
+                <span id="worker-error-count" class="hidden text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded"></span>
+            </div>
+            
+            <div class="mb-2">
+                <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                    <div id="worker-progress-bar" class="bg-gradient-to-r from-blue-500 to-indigo-600 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <div class="flex items-center justify-between text-sm">
+                <span id="worker-progress-text" class="text-gray-700 font-medium">0 / 0 keywords checked</span>
+                <span id="worker-current-keyword" class="text-gray-600 italic truncate max-w-md">Initializing...</span>
+            </div>
+        </div>
+
+        <!-- KPI Metrics Grid -->
+        <div class="grid grid-cols-4 gap-4 mb-6">
+            <div class="metric-card bg-white border border-gray-200 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-gray-500 uppercase">Keywords</span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span id="total-keywords" class="text-2xl font-bold text-gray-900">-</span>
+                    <span class="text-xs text-gray-500">tracked</span>
+                </div>
+            </div>
+
+            <div class="metric-card bg-white border border-gray-200 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-gray-500 uppercase">In Top 3</span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span id="top-3" class="text-2xl font-bold text-red-600">-</span>
+                    <span class="text-xs text-gray-500">keywords</span>
+                </div>
+            </div>
+
+            <div class="metric-card bg-white border border-gray-200 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-gray-500 uppercase">In Top 10</span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span id="top-10" class="text-2xl font-bold text-red-600">-</span>
+                    <span class="text-xs text-gray-500">keywords</span>
+                </div>
+            </div>
+
+            <div class="metric-card bg-white border border-gray-200 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-gray-500 uppercase">Avg Rank</span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span id="avg-rank" class="text-2xl font-bold text-gray-900">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rank Distribution Chart -->
+        <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+            <h3 class="text-base font-semibold text-gray-900 mb-4">Rank Distribution</h3>
+            <div class="grid grid-cols-6 gap-3">
+                <div class="text-center">
+                    <div class="bg-red-50 border-2 border-red-500 rounded-lg p-4 mb-2">
+                        <div id="dist-1-3" class="text-3xl font-bold text-red-600">-</div>
+                    </div>
+                    <div class="text-xs font-medium text-gray-600">Top 3</div>
+                </div>
+                <div class="text-center">
+                    <div class="bg-orange-50 border-2 border-orange-400 rounded-lg p-4 mb-2">
+                        <div id="dist-4-10" class="text-3xl font-bold text-orange-600">-</div>
+                    </div>
+                    <div class="text-xs font-medium text-gray-600">4-10</div>
+                </div>
+                <div class="text-center">
+                    <div class="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mb-2">
+                        <div id="dist-11-20" class="text-3xl font-bold text-yellow-600">-</div>
+                    </div>
+                    <div class="text-xs font-medium text-gray-600">11-20</div>
+                </div>
+                <div class="text-center">
+                    <div class="bg-blue-50 border-2 border-blue-400 rounded-lg p-4 mb-2">
+                        <div id="dist-21-50" class="text-3xl font-bold text-blue-600">-</div>
+                    </div>
+                    <div class="text-xs font-medium text-gray-600">21-50</div>
+                </div>
+                <div class="text-center">
+                    <div class="bg-gray-50 border-2 border-gray-300 rounded-lg p-4 mb-2">
+                        <div id="dist-51-100" class="text-3xl font-bold text-gray-600">-</div>
+                    </div>
+                    <div class="text-xs font-medium text-gray-600">51-100</div>
+                </div>
+                <div class="text-center">
+                    <div class="bg-gray-50 border-2 border-gray-200 rounded-lg p-4 mb-2">
+                        <div id="dist-unranked" class="text-3xl font-bold text-gray-400">-</div>
+                    </div>
+                    <div class="text-xs font-medium text-gray-600">Unranked</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Average Position Trend -->
+        <div class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700 rounded-2xl p-8 mb-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h3 class="text-xl font-bold text-white mb-1 flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
+                            </svg>
+                        </div>
+                        Average Position Over Time
+                    </h3>
+                    <p class="text-sm text-slate-400 ml-13">Track your ranking performance trends</p>
+                </div>
+                <select id="trend-period" class="text-sm border border-slate-600 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-700 text-white font-medium">
+                    <option value="7">Last 7 days</option>
+                    <option value="14">Last 14 days</option>
+                    <option value="30" selected>Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                </select>
+            </div>
+            <div class="bg-slate-800/50 rounded-xl p-6 backdrop-blur-sm border border-slate-700/50">
+                <canvas id="trend-chart" height="80"></canvas>
+            </div>
+        </div>
+
+        <!-- Domain Visibility Trends from Sistrix -->
+        <div id="visibility-trends-container" class="mb-6">
+            <!-- Charts will be dynamically inserted here -->
+        </div>
+
+        <!-- Add Keywords Panel (Hidden by default) -->
+        <div id="add-keywords-panel" class="bg-white border border-gray-200 rounded-lg p-6 mb-6 hidden">
+            <h3 class="text-lg font-semibold mb-4">Add Keywords</h3>
+            <form id="add-keywords-form" class="grid grid-cols-12 gap-4">
+                <input type="text" id="domain" placeholder="Domain" required
+                    class="col-span-2 text-sm border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select id="country" required class="col-span-2 text-sm border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option>United States</option>
+                    <option>France</option>
+                    <option>Germany</option>
+                    <option>Spain</option>
+                    <option>United Kingdom</option>
+                    <option>Italy</option>
+                </select>
+                <textarea id="keywords-input" placeholder="keyword, url, volume" required
+                    class="col-span-7 text-sm border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" rows="2"></textarea>
+                <button type="submit" class="col-span-1 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
+                    Add
+                </button>
+            </form>
+        </div>
+
+        <!-- Keywords Table -->
+        <div class="bg-white border border-gray-200 rounded-lg">
+            <!-- Table Header -->
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <h2 class="text-base font-semibold text-gray-900">Keyword Position Tracking</h2>
+                    <span id="results-count" class="text-sm text-gray-500">0 keywords</span>
+                </div>
+                <select id="filter-rank" class="text-sm border border-gray-300 rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Ranks</option>
+                    <option value="1-3">Top 3</option>
+                    <option value="1-10">Top 10</option>
+                    <option value="11-20">11-20</option>
+                    <option value="21-50">21-50</option>
+                </select>
+            </div>
+
+            <!-- Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                            <th class="px-6 py-3 text-left">
+                                <input type="checkbox" id="select-all" class="rounded border-gray-300">
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase sortable" data-sort="keyword">
+                                Keyword
+                            </th>
+                            <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase sortable" data-sort="current_rank">
+                                Rank
+                            </th>
+                            <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase sortable" data-sort="rank_change">
+                                7d
+                            </th>
+                            <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase sortable" data-sort="search_volume">
+                                Volume
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                                URL
+                            </th>
+                            <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase">
+                                Actions
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="keywords-table-body" class="divide-y divide-gray-100">
+                        <tr>
+                            <td colspan="7" class="px-6 py-12 text-center text-sm text-gray-500">
+                                No keywords found. Add some to get started.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                <span class="text-sm text-gray-600">
+                    <span id="showing-start">0</span>-<span id="showing-end">0</span> of <span id="showing-total">0</span>
+                </span>
+                <div class="flex gap-2">
+                    <button id="prev-page" class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50">Prev</button>
+                    <button id="next-page" class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50">Next</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSV Upload Modal -->
+    <div id="csv-upload-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-2xl w-full p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-900">Upload CSV File</h2>
+                <button id="close-csv-modal" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="mb-4">
+                <p class="text-sm text-gray-600 mb-2">Upload a CSV file with the following columns:</p>
+                <div class="bg-gray-50 border border-gray-200 rounded p-3 text-sm font-mono">
+                    <strong>Keyword, Search Volume, Target URL, Domain, Country</strong>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">Example: "0815 gutscheincode, 140, https://www.mydealz.de/gutscheine/0815-eu, mydealz.de, Germany"</p>
+            </div>
+
+            <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-4">
+                <input type="file" id="csv-file-input" accept=".csv" class="hidden">
+                <label for="csv-file-input" class="cursor-pointer">
+                    <div class="text-gray-400 mb-2">
+                        <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                    </div>
+                    <p class="text-sm text-gray-600">Click to select CSV file or drag and drop</p>
+                    <p class="text-xs text-gray-500 mt-1">CSV files only</p>
+                </label>
+            </div>
+
+            <div id="csv-preview" class="hidden mb-4">
+                <h3 class="text-sm font-semibold text-gray-900 mb-2">Preview</h3>
+                <div class="bg-gray-50 border border-gray-200 rounded p-3 max-h-48 overflow-auto">
+                    <table class="text-xs w-full">
+                        <thead>
+                            <tr class="text-left border-b border-gray-300">
+                                <th class="p-1">Keyword</th>
+                                <th class="p-1">Volume</th>
+                                <th class="p-1">Domain</th>
+                                <th class="p-1">Country</th>
+                            </tr>
+                        </thead>
+                        <tbody id="csv-preview-body"></tbody>
+                    </table>
+                </div>
+                <p id="csv-row-count" class="text-sm text-gray-600 mt-2"></p>
+            </div>
+
+            <div class="flex gap-3">
+                <button id="upload-csv-confirm" class="flex-1 bg-green-600 text-white font-medium py-2 px-4 rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed" disabled>
+                    Upload Keywords
+                </button>
+                <button id="cancel-csv-upload" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">
+                    Cancel
+                </button>
+            </div>
+
+            <div id="csv-upload-progress" class="hidden mt-4">
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div id="csv-progress-bar" class="bg-green-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <p id="csv-progress-text" class="text-sm text-gray-600 mt-2 text-center"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div id="history-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 9999; align-items: center; justify-content: center; padding: 2rem;">
+        <div style="background: white; border-radius: 8px; max-width: 900px; width: 100%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);" onclick="event.stopPropagation()">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; border-bottom: 1px solid #e5e7eb;">
+                <h3 style="font-size: 1.125rem; font-weight: 600;" id="modal-title">Ranking History</h3>
+                <button id="close-modal-btn" style="background: none; border: none; font-size: 1.5rem; color: #9ca3af; cursor: pointer; width: 32px; height: 32px;" onmouseover="this.style.color='#4b5563'" onmouseout="this.style.color='#9ca3af'">&times;</button>
+            </div>
+            <div style="padding: 1.5rem;">
+                <canvas id="history-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden file input for CSV -->
+    <input type="file" id="csv-hidden-input" accept=".csv" style="display: none;">
+
+    <script src="app.js"></script>
+</body>
+</html>
