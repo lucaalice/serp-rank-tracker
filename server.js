@@ -19,21 +19,24 @@ let workerProgress = {
 // Middleware
 app.use(express.json({ limit: '50mb' }));
 
-// Serve static files with proper MIME types
-app.use(express.static(__dirname, {
-    setHeaders: (res, filePath) => {
-        if (filePath.endsWith('.js')) {
-            res.setHeader('Content-Type', 'application/javascript');
-        }
-    }
-}));
-
 // Initialize database on startup
 initDatabase().catch(console.error);
 
+// === EXPLICIT STATIC FILE ROUTES (BEFORE API ROUTES) ===
+
+// Explicitly serve app.js with correct MIME type
+app.get('/app.js', (req, res) => {
+    res.type('application/javascript');
+    res.sendFile(path.join(__dirname, 'app.js'));
+});
+
+// Serve index.html explicitly
+app.get('/index.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 // === API ENDPOINTS ===
 
-// GET /api/summary - Returns KPI summary data
 app.get('/api/summary', async (req, res) => {
     try {
         const result = await pool.query(`
@@ -59,7 +62,6 @@ app.get('/api/summary', async (req, res) => {
     }
 });
 
-// GET /api/keywords - Returns all keywords with their current rank and change
 app.get('/api/keywords', async (req, res) => {
     try {
         const result = await pool.query(`
@@ -89,7 +91,6 @@ app.get('/api/keywords', async (req, res) => {
     }
 });
 
-// POST /api/keywords/bulk - Bulk add keywords
 app.post('/api/keywords/bulk', async (req, res) => {
     const { domain, country, keywords } = req.body;
     
@@ -130,7 +131,6 @@ app.post('/api/keywords/bulk', async (req, res) => {
     }
 });
 
-// DELETE /api/keywords/:id - Delete a keyword and its history
 app.delete('/api/keywords/:id', async (req, res) => {
     const { id } = req.params;
     const client = await pool.connect();
@@ -157,7 +157,6 @@ app.delete('/api/keywords/:id', async (req, res) => {
     }
 });
 
-// GET /api/history/:keywordId - Get ranking history for a specific keyword
 app.get('/api/history/:keywordId', async (req, res) => {
     const { keywordId } = req.params;
     
@@ -177,12 +176,10 @@ app.get('/api/history/:keywordId', async (req, res) => {
     }
 });
 
-// GET /api/worker/progress - Get current worker progress
 app.get('/api/worker/progress', (req, res) => {
     res.json(workerProgress);
 });
 
-// POST /api/worker/progress - Update worker progress (called by worker)
 app.post('/api/worker/progress', (req, res) => {
     const { isRunning, totalKeywords, checkedKeywords, errors, currentKeyword } = req.body;
     
@@ -199,7 +196,6 @@ app.post('/api/worker/progress', (req, res) => {
     res.json({ success: true });
 });
 
-// GET /api/sistrix/visibility/:domain - Get visibility data from Sistrix
 app.get('/api/sistrix/visibility/:domain', async (req, res) => {
     const { domain } = req.params;
     const { country } = req.query;
@@ -209,7 +205,6 @@ app.get('/api/sistrix/visibility/:domain', async (req, res) => {
     try {
         const axios = require('axios');
         
-        // Map country names to Sistrix country codes
         const countryMap = {
             'United States': 'us',
             'United Kingdom': 'uk',
@@ -221,7 +216,6 @@ app.get('/api/sistrix/visibility/:domain', async (req, res) => {
         
         const countryCode = countryMap[country] || 'us';
         
-        // Fetch visibility index history (last 90 days)
         const response = await axios.get('https://api.sistrix.com/domain.sichtbarkeitsindex', {
             params: {
                 api_key: SISTRIX_API_KEY,
@@ -245,18 +239,15 @@ app.get('/api/sistrix/visibility/:domain', async (req, res) => {
     }
 });
 
-// Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Serve the HTML file - THIS MUST BE LAST
+// Root route - MUST BE LAST
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Start server
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    console.log(`Dashboard: http://localhost:${PORT}`);
 });
