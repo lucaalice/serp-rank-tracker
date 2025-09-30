@@ -24,6 +24,20 @@ const exportBtn = document.getElementById('export-btn');
 const trendPeriodSelect = document.getElementById('trend-period');
 const trendChartCanvas = document.getElementById('trend-chart');
 
+// CSV Upload Elements
+const uploadCsvBtn = document.getElementById('upload-csv-btn');
+const csvUploadModal = document.getElementById('csv-upload-modal');
+const closeCsvModal = document.getElementById('close-csv-modal');
+const csvFileInput = document.getElementById('csv-file-input');
+const csvPreview = document.getElementById('csv-preview');
+const csvPreviewBody = document.getElementById('csv-preview-body');
+const csvRowCount = document.getElementById('csv-row-count');
+const uploadCsvConfirm = document.getElementById('upload-csv-confirm');
+const cancelCsvUpload = document.getElementById('cancel-csv-upload');
+const csvUploadProgress = document.getElementById('csv-upload-progress');
+const csvProgressBar = document.getElementById('csv-progress-bar');
+const csvProgressText = document.getElementById('csv-progress-text');
+
 let historyChart;
 let trendChart;
 let allKeywords = [];
@@ -31,6 +45,7 @@ let filteredKeywords = [];
 let currentSort = { column: 'keyword', direction: 'asc' };
 let currentPage = 1;
 const itemsPerPage = 50;
+let parsedCsvData = null;
 
 // Fetch and Display Data
 async function fetchDashboardData() {
@@ -46,7 +61,7 @@ async function fetchDashboardData() {
 
         const summary = await summaryRes.json();
         allKeywords = await keywordsRes.json();
-        filteredKeywords = allKeywords; // Initialize filtered with all
+        filteredKeywords = allKeywords;
         
         updateKpiCards(summary);
         populateFilters(allKeywords);
@@ -80,7 +95,6 @@ function populateFilters(keywords) {
     });
 }
 
-// Filtering and Sorting
 function applyFilters() {
     const country = filterCountry.value;
     const domain = filterDomain.value;
@@ -142,14 +156,10 @@ function updateRankDistribution() {
     document.getElementById('dist-unranked').textContent = distUnranked;
 }
 
-// Fetch and Render Trend Data
 async function fetchTrendData() {
     const days = parseInt(trendPeriodSelect.value);
-    const country = filterCountry.value;
-    const domain = filterDomain.value;
     
     try {
-        // Get all keyword IDs from filtered keywords
         const keywordIds = filteredKeywords.map(kw => kw.id);
         
         if (keywordIds.length === 0) {
@@ -157,14 +167,12 @@ async function fetchTrendData() {
             return;
         }
         
-        // Fetch history for all keywords
         const historyPromises = keywordIds.map(id => 
             fetch(`/api/history/${id}`).then(r => r.json()).catch(() => [])
         );
         
         const allHistories = await Promise.all(historyPromises);
         
-        // Aggregate data by date
         const dateMap = new Map();
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - days);
@@ -182,7 +190,6 @@ async function fetchTrendData() {
             });
         });
         
-        // Calculate average for each date
         const sortedDates = Array.from(dateMap.keys()).sort();
         const avgRanks = sortedDates.map(date => {
             const ranks = dateMap.get(date);
@@ -232,23 +239,12 @@ function renderTrendChart(dates, avgRanks) {
                 y: {
                     reverse: true,
                     beginAtZero: false,
-                    title: { 
-                        display: true, 
-                        text: 'Average Rank',
-                        font: { size: 12 }
-                    },
-                    grid: {
-                        color: 'rgba(0, 0, 0, 0.05)'
-                    }
+                    title: { display: true, text: 'Average Rank', font: { size: 12 } },
+                    grid: { color: 'rgba(0, 0, 0, 0.05)' }
                 },
                 x: {
-                    grid: {
-                        display: false
-                    },
-                    ticks: {
-                        maxRotation: 0,
-                        autoSkipPadding: 20
-                    }
+                    grid: { display: false },
+                    ticks: { maxRotation: 0, autoSkipPadding: 20 }
                 }
             },
             plugins: {
@@ -283,11 +279,9 @@ function sortKeywords() {
         let aVal = a[currentSort.column];
         let bVal = b[currentSort.column];
         
-        // Handle null values
         if (aVal === null || aVal === undefined) return 1;
         if (bVal === null || bVal === undefined) return -1;
         
-        // String comparison
         if (typeof aVal === 'string') {
             aVal = aVal.toLowerCase();
             bVal = bVal.toLowerCase();
@@ -388,7 +382,6 @@ function updatePagination() {
     document.getElementById('next-page').disabled = end >= filteredKeywords.length;
 }
 
-// History Chart
 async function fetchHistory(keywordId) {
     try {
         const res = await fetch(`/api/history/${keywordId}`);
@@ -407,7 +400,6 @@ function renderHistoryChart(history, keyword) {
     
     modalTitle.textContent = `Ranking History: "${keyword}"`;
     
-    // Check if there's any history data
     if (history.length === 0) {
         historyChartCanvas.parentElement.innerHTML = `
             <div class="text-center py-12 text-gray-500">
@@ -463,7 +455,6 @@ function renderHistoryChart(history, keyword) {
     });
 }
 
-// Export to CSV
 function exportToCSV() {
     const headers = ['Keyword', 'Rank', 'Change', 'Search Volume', 'Domain', 'Country', 'Target URL'];
     const rows = filteredKeywords.map(kw => [
@@ -490,10 +481,187 @@ function exportToCSV() {
     window.URL.revokeObjectURL(url);
 }
 
+// CSV Upload Functions
+function openCsvModal() {
+    csvUploadModal.classList.remove('hidden');
+    parsedCsvData = null;
+    csvPreview.classList.add('hidden');
+    uploadCsvConfirm.disabled = true;
+    csvFileInput.value = '';
+}
+
+function closeCsvModalHandler() {
+    csvUploadModal.classList.add('hidden');
+    parsedCsvData = null;
+}
+
+function handleCsvFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    if (!file.name.endsWith('.csv')) {
+        alert('Please select a CSV file');
+        return;
+    }
+    
+    Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+            if (results.errors.length > 0) {
+                console.error('CSV parsing errors:', results.errors);
+                alert('Error parsing CSV file. Please check the format.');
+                return;
+            }
+            
+            processCSVData(results.data);
+        },
+        error: function(error) {
+            console.error('CSV parsing error:', error);
+            alert('Error reading CSV file.');
+        }
+    });
+}
+
+function processCSVData(data) {
+    // Expected columns: Keyword, Search Volume, Target URL, Domain, Country
+    const requiredColumns = ['Keyword', 'Search Volume', 'Target URL', 'Domain', 'Country'];
+    
+    if (data.length === 0) {
+        alert('CSV file is empty');
+        return;
+    }
+    
+    const headers = Object.keys(data[0]);
+    const missingColumns = requiredColumns.filter(col => !headers.includes(col));
+    
+    if (missingColumns.length > 0) {
+        alert(`Missing required columns: ${missingColumns.join(', ')}\n\nExpected columns: ${requiredColumns.join(', ')}`);
+        return;
+    }
+    
+    // Group by domain and country
+    const grouped = {};
+    data.forEach(row => {
+        const keyword = (row.Keyword || '').trim();
+        const volume = parseInt(row['Search Volume']) || 0;
+        const url = (row['Target URL'] || '').trim();
+        const domain = (row.Domain || '').trim();
+        const country = (row.Country || '').trim();
+        
+        if (!keyword || !url || !domain || !country) return;
+        
+        const key = `${domain}|${country}`;
+        if (!grouped[key]) {
+            grouped[key] = {
+                domain,
+                country,
+                keywords: []
+            };
+        }
+        
+        grouped[key].keywords.push({
+            keyword,
+            target_url: url,
+            search_volume: volume
+        });
+    });
+    
+    parsedCsvData = Object.values(grouped);
+    displayCsvPreview(parsedCsvData);
+    uploadCsvConfirm.disabled = false;
+}
+
+function displayCsvPreview(groups) {
+    csvPreviewBody.innerHTML = '';
+    
+    let totalKeywords = 0;
+    groups.forEach(group => {
+        totalKeywords += group.keywords.length;
+        
+        // Show first 3 keywords from each group
+        const preview = group.keywords.slice(0, 3);
+        preview.forEach((kw, idx) => {
+            const row = document.createElement('tr');
+            row.className = 'border-b border-gray-200';
+            row.innerHTML = `
+                <td class="p-1 truncate max-w-xs" title="${kw.keyword}">${kw.keyword}</td>
+                <td class="p-1">${kw.search_volume}</td>
+                <td class="p-1">${group.domain}</td>
+                <td class="p-1">${group.country}</td>
+            `;
+            csvPreviewBody.appendChild(row);
+        });
+        
+        if (group.keywords.length > 3) {
+            const moreRow = document.createElement('tr');
+            moreRow.innerHTML = `
+                <td colspan="4" class="p-1 text-gray-500 italic text-xs">
+                    ... and ${group.keywords.length - 3} more keywords for ${group.domain} (${group.country})
+                </td>
+            `;
+            csvPreviewBody.appendChild(moreRow);
+        }
+    });
+    
+    csvRowCount.textContent = `Total: ${totalKeywords} keywords across ${groups.length} domain/country combination(s)`;
+    csvPreview.classList.remove('hidden');
+}
+
+async function uploadCsvData() {
+    if (!parsedCsvData || parsedCsvData.length === 0) {
+        alert('No data to upload');
+        return;
+    }
+    
+    uploadCsvConfirm.disabled = true;
+    csvUploadProgress.classList.remove('hidden');
+    
+    let completed = 0;
+    const total = parsedCsvData.length;
+    
+    for (const group of parsedCsvData) {
+        try {
+            csvProgressText.textContent = `Uploading ${group.domain} (${group.country})... (${completed + 1}/${total})`;
+            csvProgressBar.style.width = `${(completed / total) * 100}%`;
+            
+            const res = await fetch('/api/keywords/bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    domain: group.domain,
+                    country: group.country,
+                    keywords: group.keywords
+                })
+            });
+            
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || 'Failed to upload');
+            }
+            
+            completed++;
+        } catch (error) {
+            console.error(`Error uploading ${group.domain}:`, error);
+            alert(`Error uploading keywords for ${group.domain}: ${error.message}`);
+            break;
+        }
+    }
+    
+    csvProgressBar.style.width = '100%';
+    csvProgressText.textContent = `Successfully uploaded ${completed}/${total} groups!`;
+    
+    setTimeout(() => {
+        closeCsvModalHandler();
+        fetchDashboardData();
+        csvUploadProgress.classList.add('hidden');
+        csvProgressBar.style.width = '0%';
+    }, 1500);
+}
+
 // Event Listeners
 document.addEventListener('DOMContentLoaded', fetchDashboardData);
 
-// Toggle add keywords panel
 addKeywordsToggle.addEventListener('click', () => {
     addKeywordsPanel.classList.toggle('hidden');
 });
@@ -566,6 +734,20 @@ keywordsTableBody.addEventListener('click', async (e) => {
     }
 });
 
+// CSV Upload Event Listeners
+uploadCsvBtn.addEventListener('click', openCsvModal);
+closeCsvModal.addEventListener('click', closeCsvModalHandler);
+cancelCsvUpload.addEventListener('click', closeCsvModalHandler);
+csvFileInput.addEventListener('change', handleCsvFileSelect);
+uploadCsvConfirm.addEventListener('click', uploadCsvData);
+
+// Close modal when clicking outside
+csvUploadModal.addEventListener('click', (e) => {
+    if (e.target === csvUploadModal) {
+        closeCsvModalHandler();
+    }
+});
+
 // Sorting
 document.querySelectorAll('.sortable').forEach(header => {
     header.addEventListener('click', () => {
@@ -614,7 +796,6 @@ selectAllCheckbox.addEventListener('change', (e) => {
 keywordsTableBody.addEventListener('change', (e) => {
     if (e.target.classList.contains('keyword-checkbox')) {
         const anyChecked = document.querySelectorAll('.keyword-checkbox:checked').length > 0;
-        // Update UI if needed
     }
 });
 
@@ -624,7 +805,6 @@ exportBtn.addEventListener('click', exportToCSV);
 // Modal
 function closeModal() {
     historyModal.classList.remove('is-open');
-    // Restore canvas if it was replaced
     const chartContainer = document.querySelector('#history-modal .p-6');
     if (!document.getElementById('history-chart')) {
         chartContainer.innerHTML = '<canvas id="history-chart"></canvas>';
@@ -638,9 +818,14 @@ historyModal.addEventListener('click', (e) => {
     }
 });
 
-// Also allow ESC key to close modal
+// ESC key to close modals
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && historyModal.classList.contains('is-open')) {
-        closeModal();
+    if (e.key === 'Escape') {
+        if (historyModal.classList.contains('is-open')) {
+            closeModal();
+        }
+        if (!csvUploadModal.classList.contains('hidden')) {
+            closeCsvModalHandler();
+        }
     }
 });
