@@ -625,6 +625,12 @@ async function uploadCsvData() {
             csvProgressText.textContent = `Uploading ${group.domain} (${group.country})... (${completed + 1}/${total})`;
             csvProgressBar.style.width = `${(completed / total) * 100}%`;
             
+            console.log('Uploading group:', {
+                domain: group.domain,
+                country: group.country,
+                keywordCount: group.keywords.length
+            });
+            
             const res = await fetch('/api/keywords/bulk', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -635,15 +641,27 @@ async function uploadCsvData() {
                 })
             });
             
+            // Get response text first
+            const responseText = await res.text();
+            console.log('Response status:', res.status);
+            console.log('Response text:', responseText);
+            
             if (!res.ok) {
-                const error = await res.json();
-                throw new Error(error.error || 'Failed to upload');
+                let errorMessage = 'Failed to upload';
+                try {
+                    const errorData = JSON.parse(responseText);
+                    errorMessage = errorData.error || errorMessage;
+                } catch (e) {
+                    // Response is HTML, not JSON
+                    errorMessage = `Server error (${res.status}). Check console for details.`;
+                }
+                throw new Error(errorMessage);
             }
             
             completed++;
         } catch (error) {
             console.error(`Error uploading ${group.domain}:`, error);
-            alert(`Error uploading keywords for ${group.domain}: ${error.message}`);
+            alert(`Error uploading keywords for ${group.domain}: ${error.message}\n\nCheck browser console for more details.`);
             break;
         }
     }
