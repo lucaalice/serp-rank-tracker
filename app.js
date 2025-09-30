@@ -458,7 +458,7 @@ function renderDomainVisibilityChart(domain, country, data, container) {
     top10El.textContent = top10Count || '0';
     totalKeywordsEl.textContent = filteredKeywords.length || '0';
     
-    uupdateRankDistribution();
+    updateRankDistribution();
 
 function updateRankDistribution() {
     const dist1_3 = filteredKeywords.filter(kw => kw.current_rank && kw.current_rank >= 1 && kw.current_rank <= 3).length;
