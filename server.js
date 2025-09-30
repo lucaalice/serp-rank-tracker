@@ -5,7 +5,6 @@ const { pool, initDatabase } = require('./database');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Store worker progress in memory
 let workerProgress = {
     isRunning: false,
     totalKeywords: 0,
@@ -16,26 +15,10 @@ let workerProgress = {
     currentKeyword: null
 };
 
-// Middleware
 app.use(express.json({ limit: '50mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Initialize database on startup
 initDatabase().catch(console.error);
-
-// === EXPLICIT STATIC FILE ROUTES (BEFORE API ROUTES) ===
-
-// Explicitly serve app.js with correct MIME type
-app.get('/app.js', (req, res) => {
-    res.type('application/javascript');
-    res.sendFile(path.join(__dirname, 'app.js'));
-});
-
-// Serve index.html explicitly
-app.get('/index.html', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// === API ENDPOINTS ===
 
 app.get('/api/summary', async (req, res) => {
     try {
@@ -66,15 +49,8 @@ app.get('/api/keywords', async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT 
-                id,
-                keyword,
-                domain,
-                country,
-                target_url,
-                current_rank,
-                previous_rank,
-                search_volume,
-                last_checked,
+                id, keyword, domain, country, target_url,
+                current_rank, previous_rank, search_volume, last_checked,
                 (CASE 
                     WHEN previous_rank IS NOT NULL AND current_rank IS NOT NULL 
                     THEN current_rank - previous_rank 
@@ -137,7 +113,6 @@ app.delete('/api/keywords/:id', async (req, res) => {
     
     try {
         await client.query('BEGIN');
-        
         await client.query('DELETE FROM ranking_history WHERE keyword_id = $1', [id]);
         const result = await client.query('DELETE FROM keywords WHERE id = $1 RETURNING *', [id]);
         
@@ -196,56 +171,12 @@ app.post('/api/worker/progress', (req, res) => {
     res.json({ success: true });
 });
 
-app.get('/api/sistrix/visibility/:domain', async (req, res) => {
-    const { domain } = req.params;
-    const { country } = req.query;
-    
-    const SISTRIX_API_KEY = process.env.SISTRIX_API_KEY || 'C9mgcKkBFYz75TxSeAYkpEHdbKrvkmV6Lg9T';
-    
-    try {
-        const axios = require('axios');
-        
-        const countryMap = {
-            'United States': 'us',
-            'United Kingdom': 'uk',
-            'France': 'fr',
-            'Germany': 'de',
-            'Spain': 'es',
-            'Italy': 'it'
-        };
-        
-        const countryCode = countryMap[country] || 'us';
-        
-        const response = await axios.get('https://api.sistrix.com/domain.sichtbarkeitsindex', {
-            params: {
-                api_key: SISTRIX_API_KEY,
-                domain: domain,
-                country: countryCode,
-                format: 'json'
-            },
-            timeout: 10000
-        });
-        
-        if (response.data && response.data.answer && response.data.answer[0]) {
-            const data = response.data.answer[0].sichtbarkeitsindex || [];
-            res.json(data);
-        } else {
-            res.json([]);
-        }
-        
-    } catch (error) {
-        console.error('Sistrix API error:', error.message);
-        res.status(500).json({ error: 'Failed to fetch Sistrix data', message: error.message });
-    }
-});
-
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Root route - MUST BE LAST
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, () => {
